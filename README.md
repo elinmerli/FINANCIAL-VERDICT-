@@ -1,75 +1,54 @@
-THE MONETARY ARCHIVE
-====================
 
-PROJECT STRUCTURE
+# THE MONETARY ARCHIVE
 
-The Monetary Archive/
-│
-├── index.html
-├── styles.css
-├── data.js
-├── script.js
-├── globe.js
-└── README.md
+International financial and economic information portal.
 
+## Project files
 
-IMPORTANT
+- index.html — application entry point
+- styles.css — visual design and responsive layout
+- data.js — financial data providers and calculations
+- script.js — shared formatting and interface helpers
+- globe.js — interactive 3D Earth
+- app.js — navigation, pages, charts and application logic
 
-This is a single-page application.
+## Installation
 
-All navigation takes place inside index.html.
-The sidebar does not redirect the user to separate HTML pages.
-
-
-HOW TO START
-
-1. Put all files into one folder.
-
-2. Install Visual Studio Code.
-
+1. Keep all seven files in the same folder.
+2. Open the folder in Visual Studio Code.
 3. Install the Live Server extension.
+4. Right-click index.html.
+5. Select Open with Live Server.
+6. Wait for the financial data providers to respond.
 
-4. Open the project folder in Visual Studio Code.
+Do not open index.html directly using file://.
 
-5. Right-click index.html.
+## Data providers
 
-6. Select Open with Live Server.
+- Frankfurter — currency reference rates
+- Narodowy Bank Polski — gold prices
+- CoinPaprika — Bitcoin market information
+- World Bank — economic indicators
+- World Atlas — country boundaries
+- Globe.gl — interactive 3D globe
+- Chart.js — financial charts
 
+## Important notes
 
-DATA SOURCES
+Public APIs may have temporary outages, rate limits or unavailable historical observations.
 
-NBP:
-https://api.nbp.pl/
+Reference exchange rates are not live trading quotes.
 
-CoinGecko:
-https://www.coingecko.com/
+Stock exchange and cryptocurrency exchange names are currently directory entries, not connected live trading feeds.
 
-Frankfurter:
-https://www.frankfurter.dev/
+Unavailable values are not replaced with fabricated data.
 
-World Bank:
-https://data.worldbank.org/
+## Troubleshooting
 
+If the page is blank:
 
-IMPORTANT DATA NOTES
-
-Some APIs have request limits.
-
-Some indicators are updated daily.
-Macroeconomic data may be updated quarterly or annually.
-
-Unavailable data is shown as unavailable.
-The application does not intentionally create fake financial quotes.
-
-
-TECHNOLOGY
-
-HTML
-CSS
-JavaScript
-Chart.js
-Globe.gl
-World Bank API
-NBP API
-CoinGecko API
-Frankfurter API
+1. Check that all filenames match exactly.
+2. Check that all seven files are in the same folder.
+3. Open the browser developer console with F12.
+4. Check the Console and Network tabs.
+5. Check whether external libraries and API requests loaded successfully.
