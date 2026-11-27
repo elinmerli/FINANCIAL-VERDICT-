@@ -2,12 +2,12 @@
 (() => {
   "use strict";
 
+  const app = document.getElementById("app");
   const D = window.ArchiveData;
   const UI = window.ArchiveUI;
 
-  if (!D || !UI) {
-    document.getElementById("app").innerHTML =
-      '<div class="status error">Application modules failed to load. Check data.js and script.js.</div>';
+  if (!app || !D || !UI) {
+    if (app) app.innerHTML = '<div class="status error">A required application file failed to load. Check the script filenames and browser console.</div>';
     return;
   }
 
@@ -22,20 +22,70 @@
     ["exchanges", "Exchanges"]
   ];
 
-  let currentPage = "overview";
-  let currency = "USD";
-  let charts = [];
-  let loadVersion = 0;
+  const countryCodes = {
+    "United States of America": "USA",
+    "United States": "USA",
+    "Poland": "POL",
+    "United Kingdom": "GBR",
+    "Germany": "DEU",
+    "France": "FRA",
+    "Japan": "JPN",
+    "China": "CHN",
+    "India": "IND",
+    "Brazil": "BRA",
+    "Canada": "CAN",
+    "Australia": "AUS",
+    "Switzerland": "CHE",
+    "Spain": "ESP",
+    "Italy": "ITA",
+    "Netherlands": "NLD",
+    "Sweden": "SWE",
+    "Norway": "NOR",
+    "Denmark": "DNK",
+    "South Korea": "KOR",
+    "Mexico": "MEX",
+    "South Africa": "ZAF",
+    "Turkey": "TUR",
+    "Ukraine": "UKR",
+    "Argentina": "ARG",
+    "New Zealand": "NZL",
+    "Ireland": "IRL",
+    "Portugal": "PRT",
+    "Belgium": "BEL",
+    "Austria": "AUT",
+    "Greece": "GRC",
+    "Finland": "FIN",
+    "Romania": "ROU",
+    "Czechia": "CZE",
+    "Hungary": "HUN",
+    "Bulgaria": "BGR",
+    "Croatia": "HRV",
+    "Egypt": "EGY",
+    "Nigeria": "NGA",
+    "Indonesia": "IDN",
+    "Thailand": "THA",
+    "Singapore": "SGP",
+    "Chile": "CHL",
+    "Colombia": "COL",
+    "Peru": "PER",
+    "Saudi Arabia": "SAU",
+    "Pakistan": "PAK",
+    "Bangladesh": "BGD",
+    "Vietnam": "VNM",
+    "Malaysia": "MYS"
+  };
 
-  const app = document.getElementById("app");
+  let currentPage = "overview";
+  let displayCurrency = "USD";
+  let pageToken = 0;
 
   app.innerHTML = `
     <div id="layout">
       <aside class="sidebar">
-        <h1 class="brand">The Monetary<br>Archive</h1>
+        <div class="brand">The Monetary<br>Archive</div>
         <div class="brand-subtitle">International financial record</div>
-        <nav class="navigation" id="navigation"></nav>
-        <div class="sidebar-note">
+        <nav class="nav" id="nav"></nav>
+        <div class="sidebar-foot">
           A GLOBAL RECORD OF<br>
           MARKETS, CURRENCIES<br>
           AND ECONOMIC HISTORY
@@ -46,9 +96,9 @@
         <header class="topbar">
           <div>
             <div class="eyebrow">The international financial archive</div>
-            <div class="update-time" id="update-time">Connecting to data sources…</div>
+            <div id="update-status">Connecting to financial sources…</div>
           </div>
-          <select class="currency-select" id="display-currency" aria-label="Display currency">
+          <select id="display-currency" aria-label="Display currency">
             ${D.currencies.map(code =>
               `<option value="${code}" ${code === "USD" ? "selected" : ""}>${code}</option>`
             ).join("")}
@@ -58,96 +108,64 @@
         <div id="page-content"></div>
 
         <footer class="footer">
-          DATA IS PROVIDED FOR INFORMATIONAL PURPOSES.
-          MARKET DATA MAY BE DELAYED.
-          ECONOMIC INDICATORS RETAIN THEIR ORIGINAL OBSERVATION DATES.
-          UNAVAILABLE DATA IS NEVER REPLACED WITH INVENTED VALUES.
+          DATA SOURCES: FRANKFURTER · NBP · COINPAPRIKA · WORLD BANK.
+          REFERENCE RATES MAY BE DELAYED. UNAVAILABLE OBSERVATIONS ARE NOT FABRICATED.
         </footer>
       </main>
     </div>
   `;
 
-  const nav = document.getElementById("navigation");
+  const nav = document.getElementById("nav");
   const content = document.getElementById("page-content");
   const currencySelect = document.getElementById("display-currency");
+  const updateStatus = document.getElementById("update-status");
 
-  function money(value, from = currency) {
+  function money(value, from = displayCurrency) {
     if (value === null || value === undefined || !Number.isFinite(Number(value))) {
       return "Unavailable";
     }
 
-    if (from === currency) return UI.money(value, currency);
+    if (from === displayCurrency) {
+      return UI.money(value, displayCurrency);
+    }
 
-    const converted = D.convert(Number(value), from, currency);
-    return converted === null ? "Unavailable" : UI.money(converted, currency);
+    const converted = D.convert(value, from, displayCurrency);
+    return converted === null ? "Unavailable" : UI.money(converted, displayCurrency);
   }
 
-  function title(text, description) {
-    return `
-      <h1 class="page-title">${UI.escape(text)}</h1>
-      <p class="page-description">${UI.escape(description)}</p>
-    `;
+  function pageHeading(heading, description) {
+    return `<h1 class="page-title">${UI.escape(heading)}</h1>
+      <p class="page-description">${UI.escape(description)}</p>`;
   }
 
-  function clearCharts() {
-    charts.forEach(chart => {
-      try { chart.destroy(); } catch {}
-    });
-    charts = [];
+  function showError(message) {
+    content.insertAdjacentHTML("afterbegin", UI.status(message, true));
   }
 
-  function makeChart(id, labels, values, label) {
-    const canvas = document.getElementById(id);
-    if (!canvas || !window.Chart || !values.length) return;
-
-    const instance = new Chart(canvas, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label,
-          data: values,
-          borderColor: "#a58b59",
-          backgroundColor: "rgba(165,139,89,0.10)",
-          fill: true,
-          tension: 0.25,
-          pointRadius: 1.5,
-          borderWidth: 2
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            labels: { color: "#c9c1b2" }
-          }
-        },
-        scales: {
-          x: {
-            ticks: { color: "#928c7e", maxTicksLimit: 8 },
-            grid: { color: "#302f29" }
-          },
-          y: {
-            ticks: { color: "#928c7e" },
-            grid: { color: "#302f29" }
-          }
-        }
-      }
+  function chart(id, records, valueKey, sourceCurrency, label) {
+    const values = records.map(record => {
+      const raw = Number(record[valueKey]);
+      if (!Number.isFinite(raw)) return null;
+      if (!sourceCurrency) return raw;
+      return D.convert(raw, sourceCurrency, displayCurrency);
     });
 
-    charts.push(instance);
+    UI.drawChart(
+      id,
+      records.map(record => record.date),
+      values,
+      label
+    );
   }
 
-  function showPage(page) {
+  function render(page) {
     if (!pages.some(item => item[0] === page)) page = "overview";
 
     currentPage = page;
-    loadVersion++;
-    clearCharts();
+    const token = ++pageToken;
 
-    if (page !== "globe") {
-      window.ArchiveGlobe?.destroy();
+    if (page !== "globe" && window.ArchiveGlobe) {
+      window.ArchiveGlobe.destroy();
     }
 
     nav.querySelectorAll("button").forEach(button => {
@@ -165,7 +183,11 @@
       exchanges: renderExchanges
     };
 
-    renderers[page]();
+    try {
+      renderers[page](token);
+    } catch (error) {
+      content.innerHTML = UI.status(`Page error: ${error.message}`, true);
+    }
   }
 
   pages.forEach(([id, label]) => {
@@ -173,234 +195,57 @@
     button.type = "button";
     button.textContent = label;
     button.dataset.page = id;
-    button.addEventListener("click", () => showPage(id));
+    button.addEventListener("click", () => render(id));
     nav.appendChild(button);
   });
 
-  async function renderOverview() {
-    const version = loadVersion;
-    const s = D.state;
-    const btc = s.bitcoin;
-    const gold = s.gold;
+  async function renderOverview(token) {
+    const state = D.state;
+    const btc = state.bitcoin;
+    const gold = state.gold;
+    const usdRate = state.rates.USD;
 
     content.innerHTML =
-      title("Global Financial Overview",
-        "A consolidated view of currency markets, precious metals and the international economy.") +
-      `<div class="metric-grid">
+      pageHeading(
+        "Global Financial Overview",
+        "An international overview of currency markets, precious metals, digital assets and economic indicators."
+      ) +
+      `<div class="metrics">
         ${UI.metric("Bitcoin", btc ? money(btc.priceUSD, "USD") : "Unavailable",
-          btc ? `24h change: ${UI.number(btc.change24h)}% · CoinPaprika` : "Source unavailable")}
+          btc ? `24h: ${UI.number(btc.change24h)}% · CoinPaprika` : "Source unavailable")}
         ${UI.metric("Gold · per gram", gold ? money(gold.pricePLN, "PLN") : "Unavailable",
           gold ? `NBP · ${gold.date}` : "Source unavailable")}
-        ${UI.metric("USD / EUR", s.rates.USD ? UI.number(s.rates.USD) : "Unavailable",
-          `Frankfurter · ${s.rateDate || "Date unavailable"}`)}
-        ${UI.metric("EUR / USD", s.rates.USD ? UI.number(1 / s.rates.USD) : "Unavailable",
+        ${UI.metric("USD / EUR", usdRate ? UI.number(usdRate) : "Unavailable",
+          `Frankfurter · ${state.rateDate || "Date unavailable"}`)}
+        ${UI.metric("EUR / USD", usdRate ? UI.number(1 / usdRate) : "Unavailable",
           "Reference conversion")}
       </div>` +
       UI.panel("Bitcoin Market", `
-        <div class="metric-grid">
+        <div class="metrics">
           ${UI.metric("24-hour change", btc ? `${UI.number(btc.change24h)}%` : "Unavailable", "CoinPaprika")}
-          ${UI.metric("Market capitalization", btc ? money(btc.marketCapUSD, "USD") : "Unavailable", "Converted from USD")}
-          ${UI.metric("24-hour volume", btc ? money(btc.volumeUSD, "USD") : "Unavailable", "Converted from USD")}
-          ${UI.metric("Last update", btc ? UI.date(btc.updated) : "Unavailable", "Provider timestamp")}
+          ${UI.metric("Market capitalization", btc ? money(btc.marketCapUSD, "USD") : "Unavailable", "USD reference")}
+          ${UI.metric("24-hour volume", btc ? money(btc.volumeUSD, "USD") : "Unavailable", "USD reference")}
+          ${UI.metric("Last provider update", btc ? UI.date(btc.updated) : "Unavailable", "Provider timestamp")}
         </div>
       `) +
-      UI.panel("Bitcoin · Historical Price", `
-        <div class="chart-area"><canvas id="overview-chart"></canvas></div>
+      UI.panel("Bitcoin Historical Price", `
+        <canvas id="overview-chart" class="chart"></canvas>
       `) +
       UI.panel("United States · Economic Indicators", `
-        <div id="overview-economy">${UI.status("Loading World Bank indicators…")}</div>
+        <div id="overview-economy">${UI.status("Requesting World Bank observations…")}</div>
       `) +
-      `<div id="overview-errors"></div>`;
+      `<div id="overview-source-errors"></div>`;
 
-    if (s.bitcoinHistory.length) {
-      makeChart(
-        "overview-chart",
-        s.bitcoinHistory.map(x => new Date(x.date).toLocaleDateString()),
-        s.bitcoinHistory.map(x => {
-          const value = D.convert(x.priceUSD, "USD", currency);
-          return value === null ? null : value;
-        }),
-        `Bitcoin / ${currency}`
-      );
+    if (state.bitcoinHistory.length) {
+      chart("overview-chart", state.bitcoinHistory, "priceUSD", "USD", `BTC / ${displayCurrency}`);
+    } else {
+      const canvas = document.getElementById("overview-chart");
+      if (canvas) UI.drawChart("overview-chart", [], [], "Bitcoin history");
     }
 
     try {
-      const economy = await D.loadEconomy("USA");
-      if (version !== loadVersion || currentPage !== "overview") return;
-
-      const labels = {
-        inflation: "Inflation",
-        gdpGrowth: "GDP growth",
-        unemployment: "Unemployment",
-        gdpPerCapita: "GDP per capita"
-      };
-
-      const rows = Object.entries(labels).map(([key, label]) => {
-        const item = economy[key];
-        return [
-          label,
-          item ? `${UI.number(item.value)}${key === "gdpPerCapita" ? " USD" : "%"}` : "Unavailable",
-          item?.year || "—",
-          "World Bank"
-        ];
-      });
-
-      document.getElementById("overview-economy").innerHTML =
-        UI.table(["Indicator", "Value", "Year", "Source"], rows);
-    } catch {
-      const target = document.getElementById("overview-economy");
-      if (target) target.innerHTML = UI.status("World Bank data is unavailable.", true);
-    }
-
-    const errors = Object.entries(s.errors);
-    const errorTarget = document.getElementById("overview-errors");
-
-    if (errorTarget && errors.length) {
-      errorTarget.innerHTML = UI.status(
-        "Some data sources did not respond: " +
-        errors.map(([name, error]) => `${name}: ${error}`).join(" · "),
-        true
-      );
-    }
-  }
-
-  function renderCurrencies() {
-    const rows = Object.entries(D.state.rates)
-      .filter(([code]) => D.currencies.includes(code))
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([code, rate]) => [
-        code,
-        UI.number(rate),
-        `1 EUR = ${UI.number(rate)} ${code}`,
-        D.state.rateDate || "Unavailable"
-      ]);
-
-    content.innerHTML =
-      title("Currencies",
-        "Reference exchange rates from the European Central Bank via Frankfurter. These are not live bank trading quotes.") +
-      `<div class="panel">
-        <input class="field" id="currency-search" placeholder="Search currency">
-        ${UI.table(["Currency", "Rate", "EUR reference", "Date"], rows)}
-      </div>` +
-      UI.panel("Currency Converter", `
-        <div class="form-grid">
-          <label class="field-label">Amount
-            <input class="field" id="fx-amount" type="number" min="0" value="100">
-          </label>
-          <label class="field-label">From
-            <select class="field" id="fx-from">
-              ${D.currencies.map(c => `<option>${c}</option>`).join("")}
-            </select>
-          </label>
-          <label class="field-label">To
-            <select class="field" id="fx-to">
-              ${D.currencies.map(c => `<option ${c === currency ? "selected" : ""}>${c}</option>`).join("")}
-            </select>
-          </label>
-        </div>
-        <button class="action-button" id="fx-run">Convert</button>
-        <div class="result" id="fx-result">—</div>
-      `);
-
-    document.getElementById("currency-search").addEventListener("input", event => {
-      const query = event.target.value.toLowerCase();
-      document.querySelectorAll(".data-table tbody tr").forEach(row => {
-        row.hidden = !row.textContent.toLowerCase().includes(query);
-      });
-    });
-
-    document.getElementById("fx-run").addEventListener("click", () => {
-      const amount = Number(document.getElementById("fx-amount").value);
-      const from = document.getElementById("fx-from").value;
-      const to = document.getElementById("fx-to").value;
-      const result = D.convert(amount, from, to);
-
-      document.getElementById("fx-result").textContent =
-        result === null ? "Rate unavailable" : UI.money(result, to);
-    });
-  }
-
-  function renderMarkets() {
-    const btc = D.state.bitcoin;
-    const gold = D.state.gold;
-
-    content.innerHTML =
-      title("Markets & Bitcoin",
-        "Cryptocurrency market data and precious metals. Exchange names are not presented as live market quotes.") +
-      `<div class="metric-grid">
-        ${UI.metric("Bitcoin price", btc ? money(btc.priceUSD, "USD") : "Unavailable", "CoinPaprika")}
-        ${UI.metric("24h change", btc ? `${UI.number(btc.change24h)}%` : "Unavailable", "24-hour percentage")}
-        ${UI.metric("Market capitalization", btc ? money(btc.marketCapUSD, "USD") : "Unavailable", "CoinPaprika")}
-        ${UI.metric("Trading volume", btc ? money(btc.volumeUSD, "USD") : "Unavailable", "24-hour volume")}
-      </div>` +
-      UI.panel("Bitcoin Historical Price", `
-        <div class="chart-area"><canvas id="market-chart"></canvas></div>
-        <p class="panel-note">Historical data is subject to the provider's availability and free-tier limits.</p>
-      `) +
-      UI.panel("Gold", `
-        <div class="metric-grid">
-          ${UI.metric("Gold per gram", gold ? money(gold.pricePLN, "PLN") : "Unavailable",
-            gold ? `NBP · ${gold.date}` : "Source unavailable")}
-        </div>
-        <p class="panel-note">NBP reference price in PLN per gram, converted using the loaded FX rates.</p>
-      `) +
-      UI.panel("Market Venues", UI.table(
-        ["Venue", "Market", "Quote status"],
-        [
-          ["Nasdaq", "Equities", "Live quote feed not connected"],
-          ["New York Stock Exchange", "Equities", "Live quote feed not connected"],
-          ["London Stock Exchange", "Equities", "Live quote feed not connected"],
-          ["Tokyo Stock Exchange", "Equities", "Live quote feed not connected"],
-          ["Binance", "Crypto", "Live exchange feed not connected"],
-          ["Coinbase", "Crypto", "Live exchange feed not connected"],
-          ["Kraken", "Crypto", "Live exchange feed not connected"]
-        ]
-      ));
-
-    if (D.state.bitcoinHistory.length) {
-      makeChart(
-        "market-chart",
-        D.state.bitcoinHistory.map(x => new Date(x.date).toLocaleDateString()),
-        D.state.bitcoinHistory.map(x => D.convert(x.priceUSD, "USD", currency)),
-        `BTC / ${currency}`
-      );
-    }
-  }
-
-  async function renderEconomy() {
-    content.innerHTML =
-      title("Inflation & Economy",
-        "Macroeconomic indicators from the World Bank. Values retain their original observation years.") +
-      `<div class="panel">
-        <div class="form-grid">
-          <label class="field-label">Country
-            <select class="field" id="economy-country">
-              <option value="USA">United States</option>
-              <option value="POL">Poland</option>
-              <option value="GBR">United Kingdom</option>
-              <option value="DEU">Germany</option>
-              <option value="FRA">France</option>
-              <option value="JPN">Japan</option>
-              <option value="CHN">China</option>
-              <option value="IND">India</option>
-              <option value="BRA">Brazil</option>
-              <option value="CAN">Canada</option>
-              <option value="AUS">Australia</option>
-              <option value="CHE">Switzerland</option>
-            </select>
-          </label>
-        </div>
-        <button class="action-button" id="economy-load">Load indicators</button>
-      </div>
-      <div id="economy-results">${UI.status("Choose a country to load its indicators.")}</div>`;
-
-    async function load() {
-      const country = document.getElementById("economy-country").value;
-      const target = document.getElementById("economy-results");
-      target.innerHTML = UI.status("Loading World Bank data…");
-
-      const data = await D.loadEconomy(country);
-      if (currentPage !== "economy") return;
+      const data = await D.loadEconomy("USA");
+      if (token !== pageToken || currentPage !== "overview") return;
 
       const labels = {
         inflation: "Inflation",
@@ -419,8 +264,185 @@
         ];
       });
 
-      target.innerHTML = UI.panel("Latest Available Indicators",
-        UI.table(["Indicator", "Value", "Year", "Source"], rows));
+      document.getElementById("overview-economy").innerHTML =
+        UI.table(["Indicator", "Value", "Observation year", "Source"], rows);
+    } catch {
+      const target = document.getElementById("overview-economy");
+      if (target) target.innerHTML = UI.status("World Bank data could not be loaded.", true);
+    }
+
+    const errorTarget = document.getElementById("overview-source-errors");
+    const errors = Object.entries(state.errors);
+
+    if (errorTarget && errors.length) {
+      errorTarget.innerHTML = UI.status(
+        "Some providers did not respond: " +
+        errors.map(([name, error]) => `${name}: ${error}`).join(" · "),
+        true
+      );
+    }
+  }
+
+  function renderCurrencies() {
+    const entries = Object.entries(D.state.rates)
+      .filter(([code]) => D.currencies.includes(code))
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    const rows = entries.map(([code, rate]) => [
+      code,
+      UI.number(rate),
+      `1 EUR = ${UI.number(rate)} ${code}`,
+      D.state.rateDate || "Unavailable"
+    ]);
+
+    content.innerHTML =
+      pageHeading(
+        "Currencies",
+        "Reference exchange rates published through Frankfurter. These rates are not live bank or exchange trading quotes."
+      ) +
+      UI.panel("Currency Reference Table", `
+        <input id="currency-search" type="search" placeholder="Search currency code">
+        <div id="currency-table">${UI.table(["Currency", "Rate", "EUR reference", "Date"], rows)}</div>
+      `) +
+      UI.panel("Currency Converter", `
+        <div class="form-grid">
+          <label class="field-label">Amount
+            <input id="fx-amount" type="number" min="0" value="100">
+          </label>
+          <label class="field-label">From
+            <select id="fx-from">${D.currencies.map(c => `<option>${c}</option>`).join("")}</select>
+          </label>
+          <label class="field-label">To
+            <select id="fx-to">${D.currencies.map(c =>
+              `<option ${c === displayCurrency ? "selected" : ""}>${c}</option>`
+            ).join("")}</select>
+          </label>
+        </div>
+        <button class="action" id="fx-calculate">Convert</button>
+        <div class="result" id="fx-result">—</div>
+      `);
+
+    document.getElementById("currency-search").addEventListener("input", event => {
+      const query = event.target.value.toLowerCase();
+      document.querySelectorAll("#currency-table tbody tr").forEach(row => {
+        row.hidden = !row.textContent.toLowerCase().includes(query);
+      });
+    });
+
+    document.getElementById("fx-calculate").addEventListener("click", () => {
+      const amount = Number(document.getElementById("fx-amount").value);
+      const from = document.getElementById("fx-from").value;
+      const to = document.getElementById("fx-to").value;
+      const result = D.convert(amount, from, to);
+
+      document.getElementById("fx-result").textContent =
+        result === null ? "Rate unavailable for one or both currencies." : UI.money(result, to);
+    });
+  }
+
+  function renderMarkets() {
+    const btc = D.state.bitcoin;
+    const gold = D.state.gold;
+
+    content.innerHTML =
+      pageHeading(
+        "Markets & Bitcoin",
+        "Bitcoin market indicators and precious metals reference prices. Exchange directory entries are not represented as live quotes."
+      ) +
+      `<div class="metrics">
+        ${UI.metric("Bitcoin price", btc ? money(btc.priceUSD, "USD") : "Unavailable", "CoinPaprika")}
+        ${UI.metric("24h change", btc ? `${UI.number(btc.change24h)}%` : "Unavailable", "24-hour percentage")}
+        ${UI.metric("Market capitalization", btc ? money(btc.marketCapUSD, "USD") : "Unavailable", "USD reference")}
+        ${UI.metric("24h trading volume", btc ? money(btc.volumeUSD, "USD") : "Unavailable", "USD reference")}
+      </div>` +
+      UI.panel("Bitcoin · Historical Price", `
+        <canvas id="market-chart" class="chart"></canvas>
+        <p class="panel-note">History depends on the provider's endpoint and free-tier availability.</p>
+      `) +
+      UI.panel("Gold Reference Price", `
+        <div class="metrics">
+          ${UI.metric("Gold per gram", gold ? money(gold.pricePLN, "PLN") : "Unavailable",
+            gold ? `NBP · ${gold.date}` : "Source unavailable")}
+        </div>
+        <p class="panel-note">NBP reference price in Polish złoty per gram, converted using available exchange rates.</p>
+      `) +
+      UI.panel("Selected Market Venues", UI.table(
+        ["Venue", "Market", "Quote connection"],
+        [
+          ["Nasdaq", "Equities", "Not connected"],
+          ["New York Stock Exchange", "Equities", "Not connected"],
+          ["London Stock Exchange", "Equities", "Not connected"],
+          ["Tokyo Stock Exchange", "Equities", "Not connected"],
+          ["Binance", "Cryptocurrency", "Not connected"],
+          ["Coinbase", "Cryptocurrency", "Not connected"],
+          ["Kraken", "Cryptocurrency", "Not connected"]
+        ]
+      ));
+
+    if (D.state.bitcoinHistory.length) {
+      chart("market-chart", D.state.bitcoinHistory, "priceUSD", "USD", `BTC / ${displayCurrency}`);
+    } else {
+      UI.drawChart("market-chart", [], [], "Bitcoin history");
+    }
+  }
+
+  async function renderEconomy(token) {
+    const options = [
+      ["USA", "United States"], ["POL", "Poland"], ["GBR", "United Kingdom"],
+      ["DEU", "Germany"], ["FRA", "France"], ["JPN", "Japan"],
+      ["CHN", "China"], ["IND", "India"], ["BRA", "Brazil"],
+      ["CAN", "Canada"], ["AUS", "Australia"], ["CHE", "Switzerland"],
+      ["ESP", "Spain"], ["ITA", "Italy"], ["SWE", "Sweden"]
+    ];
+
+    content.innerHTML =
+      pageHeading(
+        "Inflation & Economy",
+        "Macroeconomic observations from the World Bank. Each value is shown with its actual observation year."
+      ) +
+      UI.panel("Select a Country", `
+        <div class="form-grid">
+          <label class="field-label">Country
+            <select id="economy-country">
+              ${options.map(([code, name]) => `<option value="${code}">${name}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+        <button class="action" id="economy-load">Load indicators</button>
+      `) +
+      `<div id="economy-results">${UI.status("Loading country indicators…")}</div>`;
+
+    async function load() {
+      const code = document.getElementById("economy-country").value;
+      const target = document.getElementById("economy-results");
+      target.innerHTML = UI.status("Requesting World Bank data…");
+
+      try {
+        const data = await D.loadEconomy(code);
+        if (token !== pageToken || currentPage !== "economy") return;
+
+        const labels = {
+          inflation: "Inflation",
+          gdpGrowth: "GDP growth",
+          unemployment: "Unemployment",
+          gdpPerCapita: "GDP per capita"
+        };
+
+        const rows = Object.entries(labels).map(([key, label]) => {
+          const item = data[key];
+          return [
+            label,
+            item ? `${UI.number(item.value)}${key === "gdpPerCapita" ? " USD" : "%"}` : "Unavailable",
+            item?.year || "—",
+            "World Bank"
+          ];
+        });
+
+        target.innerHTML = UI.panel("Latest Available Observations",
+          UI.table(["Indicator", "Value", "Year", "Source"], rows));
+      } catch (error) {
+        if (target) target.innerHTML = UI.status(error.message, true);
+      }
     }
 
     document.getElementById("economy-load").addEventListener("click", load);
@@ -429,63 +451,55 @@
 
   function renderCalculators() {
     content.innerHTML =
-      title("Financial Calculators",
-        "Currency conversion, interest and inflation calculations. All calculations run locally in your browser.") +
-      UI.panel("Currency Converter", `
+      pageHeading(
+        "Financial Calculators",
+        "Currency conversion uses available reference rates. Interest and inflation calculations run locally in your browser."
+      ) +
+      UI.panel("Currency Conversion", `
         <div class="form-grid">
-          <label class="field-label">Amount
-            <input class="field" id="calc-fx-amount" type="number" value="100" min="0">
-          </label>
-          <label class="field-label">From
-            <select class="field" id="calc-fx-from">
-              ${D.currencies.map(c => `<option>${c}</option>`).join("")}
-            </select>
-          </label>
-          <label class="field-label">To
-            <select class="field" id="calc-fx-to">
-              ${D.currencies.map(c => `<option ${c === currency ? "selected" : ""}>${c}</option>`).join("")}
-            </select>
-          </label>
+          <label class="field-label">Amount<input id="calc-fx-amount" type="number" min="0" value="100"></label>
+          <label class="field-label">From<select id="calc-fx-from">${D.currencies.map(c => `<option>${c}</option>`).join("")}</select></label>
+          <label class="field-label">To<select id="calc-fx-to">${D.currencies.map(c => `<option ${c === displayCurrency ? "selected" : ""}>${c}</option>`).join("")}</select></label>
         </div>
-        <button class="action-button" id="calc-fx-run">Calculate</button>
+        <button class="action" id="calc-fx">Calculate</button>
         <div class="result" id="calc-fx-result">—</div>
       `) +
       UI.panel("Compound Interest", `
         <div class="form-grid">
-          <label class="field-label">Initial amount<input class="field" id="ci-p" type="number" value="1000" min="0"></label>
-          <label class="field-label">Annual rate (%)<input class="field" id="ci-r" type="number" value="5" min="0"></label>
-          <label class="field-label">Years<input class="field" id="ci-t" type="number" value="10" min="0"></label>
-          <label class="field-label">Compounds per year<input class="field" id="ci-n" type="number" value="12" min="1"></label>
+          <label class="field-label">Principal<input id="ci-p" type="number" min="0" value="1000"></label>
+          <label class="field-label">Annual rate (%)<input id="ci-r" type="number" min="0" value="5"></label>
+          <label class="field-label">Years<input id="ci-t" type="number" min="0" value="10"></label>
+          <label class="field-label">Compounds per year<input id="ci-n" type="number" min="1" value="12"></label>
         </div>
-        <button class="action-button" id="ci-run">Calculate</button>
+        <button class="action" id="ci-run">Calculate</button>
         <div class="result" id="ci-result">—</div>
       `) +
       UI.panel("Simple Interest", `
         <div class="form-grid">
-          <label class="field-label">Principal<input class="field" id="si-p" type="number" value="1000" min="0"></label>
-          <label class="field-label">Annual rate (%)<input class="field" id="si-r" type="number" value="5" min="0"></label>
-          <label class="field-label">Years<input class="field" id="si-t" type="number" value="3" min="0"></label>
+          <label class="field-label">Principal<input id="si-p" type="number" min="0" value="1000"></label>
+          <label class="field-label">Annual rate (%)<input id="si-r" type="number" min="0" value="5"></label>
+          <label class="field-label">Years<input id="si-t" type="number" min="0" value="3"></label>
         </div>
-        <button class="action-button" id="si-run">Calculate</button>
+        <button class="action" id="si-run">Calculate</button>
         <div class="result" id="si-result">—</div>
       `) +
-      UI.panel("Inflation Calculator", `
+      UI.panel("Inflation & Future Cost", `
         <div class="form-grid">
-          <label class="field-label">Starting amount<input class="field" id="inf-p" type="number" value="1000" min="0"></label>
-          <label class="field-label">Annual inflation (%)<input class="field" id="inf-r" type="number" value="3"></label>
-          <label class="field-label">Years<input class="field" id="inf-t" type="number" value="10" min="0"></label>
+          <label class="field-label">Current amount<input id="inf-p" type="number" min="0" value="1000"></label>
+          <label class="field-label">Annual inflation (%)<input id="inf-r" type="number" value="3"></label>
+          <label class="field-label">Years<input id="inf-t" type="number" min="0" value="10"></label>
         </div>
-        <button class="action-button" id="inf-run">Calculate</button>
+        <button class="action" id="inf-run">Calculate</button>
         <div class="result" id="inf-result">—</div>
       `);
 
-    document.getElementById("calc-fx-run").onclick = () => {
+    document.getElementById("calc-fx").onclick = () => {
       const amount = Number(document.getElementById("calc-fx-amount").value);
       const from = document.getElementById("calc-fx-from").value;
       const to = document.getElementById("calc-fx-to").value;
-      const value = D.convert(amount, from, to);
+      const result = D.convert(amount, from, to);
       document.getElementById("calc-fx-result").textContent =
-        value === null ? "Rate unavailable" : UI.money(value, to);
+        result === null ? "Rate unavailable" : UI.money(result, to);
     };
 
     document.getElementById("ci-run").onclick = () => {
@@ -493,11 +507,13 @@
       const r = Number(document.getElementById("ci-r").value) / 100;
       const t = Number(document.getElementById("ci-t").value);
       const n = Number(document.getElementById("ci-n").value);
+
       const valid = [p, r, t, n].every(Number.isFinite) &&
         p >= 0 && r >= 0 && t >= 0 && n > 0;
+
       const result = valid ? p * Math.pow(1 + r / n, n * t) : NaN;
       document.getElementById("ci-result").textContent =
-        Number.isFinite(result) ? UI.money(result, currency) : "Check the entered values";
+        Number.isFinite(result) ? UI.money(result, displayCurrency) : "Check the entered values";
     };
 
     document.getElementById("si-run").onclick = () => {
@@ -505,9 +521,10 @@
       const r = Number(document.getElementById("si-r").value) / 100;
       const t = Number(document.getElementById("si-t").value);
       const result = p * (1 + r * t);
+
       document.getElementById("si-result").textContent =
         Number.isFinite(result) && p >= 0 && r >= 0 && t >= 0
-          ? UI.money(result, currency)
+          ? UI.money(result, displayCurrency)
           : "Check the entered values";
     };
 
@@ -516,58 +533,60 @@
       const r = Number(document.getElementById("inf-r").value) / 100;
       const t = Number(document.getElementById("inf-t").value);
       const result = p * Math.pow(1 + r, t);
+
       document.getElementById("inf-result").textContent =
         Number.isFinite(result) && p >= 0 && t >= 0
-          ? UI.money(result, currency)
+          ? UI.money(result, displayCurrency)
           : "Check the entered values";
     };
   }
 
-  async function renderArchive() {
+  async function renderArchive(token) {
     content.innerHTML =
-      title("Historical Archive",
-        "Historical observations available from the connected public data providers.") +
-      UI.panel("Bitcoin · Historical Price", `
-        <div class="chart-area"><canvas id="archive-btc-chart"></canvas></div>
+      pageHeading(
+        "Historical Archive",
+        "Available historical observations from connected public data providers."
+      ) +
+      UI.panel("Bitcoin Historical Price", `
+        <canvas id="archive-btc-chart" class="chart"></canvas>
       `) +
       UI.panel("Gold · NBP Daily Reference", `
-        <div id="archive-gold">${UI.status("Loading gold history…")}</div>
+        <div id="archive-gold">${UI.status("Loading historical gold observations…")}</div>
       `);
 
-    const history = D.state.bitcoinHistory;
-    if (history.length) {
-      makeChart(
-        "archive-btc-chart",
-        history.map(x => new Date(x.date).toLocaleDateString()),
-        history.map(x => D.convert(x.priceUSD, "USD", currency)),
-        `Bitcoin / ${currency}`
-      );
+    if (D.state.bitcoinHistory.length) {
+      chart("archive-btc-chart", D.state.bitcoinHistory, "priceUSD", "USD", `BTC / ${displayCurrency}`);
+    } else {
+      UI.drawChart("archive-btc-chart", [], [], "Bitcoin history");
     }
 
     try {
-      const rows = await D.loadGoldHistory();
-      if (currentPage !== "archive") return;
+      if (!D.state.goldHistory.length) await D.loadGold();
+      if (token !== pageToken || currentPage !== "archive") return;
+
+      const rows = D.state.goldHistory.slice().reverse().map(item => [
+        item.date,
+        UI.number(item.pricePLN),
+        money(item.pricePLN, "PLN"),
+        "NBP"
+      ]);
 
       document.getElementById("archive-gold").innerHTML =
-        UI.table(["Date", "Gold · PLN / gram", `Gold · ${currency} / gram`, "Source"],
-          rows.slice().reverse().map(item => [
-            item.date,
-            UI.number(item.pricePLN),
-            money(item.pricePLN, "PLN"),
-            "NBP"
-          ]));
-    } catch {
+        UI.table(["Date", "PLN / gram", `${displayCurrency} / gram`, "Source"], rows);
+    } catch (error) {
       const target = document.getElementById("archive-gold");
-      if (target) target.innerHTML = UI.status("Gold history unavailable.", true);
+      if (target) target.innerHTML = UI.status(error.message, true);
     }
   }
 
   function renderExchanges() {
     content.innerHTML =
-      title("Exchanges",
-        "A directory of major stock and cryptocurrency exchanges. Live exchange feeds are not connected in this version.") +
+      pageHeading(
+        "Exchanges",
+        "A directory of major stock and cryptocurrency exchanges. Live exchange trading feeds are not connected."
+      ) +
       UI.panel("Stock Exchanges", UI.table(
-        ["Exchange", "Location", "Market", "Quote status"],
+        ["Exchange", "Location", "Market", "Live quotes"],
         [
           ["Nasdaq", "New York, USA", "Equities", "Not connected"],
           ["New York Stock Exchange", "New York, USA", "Equities", "Not connected"],
@@ -579,7 +598,7 @@
         ]
       )) +
       UI.panel("Cryptocurrency Exchanges", UI.table(
-        ["Exchange", "Market", "Quote status"],
+        ["Exchange", "Market", "Live quotes"],
         [
           ["Binance", "Cryptocurrency", "Not connected"],
           ["Coinbase", "Cryptocurrency", "Not connected"],
@@ -590,30 +609,36 @@
       ));
   }
 
-  async function renderGlobe() {
+  async function renderGlobe(token) {
     content.innerHTML =
-      title("Global Globe",
-        "Explore geographic borders and request available economic indicators for individual countries.") +
-      `<div id="globe-container"></div>
-       <div id="country-profile">${UI.status("Select a country on the globe.")}</div>`;
+      pageHeading(
+        "Global Globe",
+        "Explore country borders on a 3D globe. Select a country to request its available economic indicators."
+      ) +
+      `<div id="globe"></div>
+       <div id="country-profile">${UI.status("Preparing the globe…")}</div>`;
 
-    const container = document.getElementById("globe-container");
+    const globeElement = document.getElementById("globe");
     const profile = document.getElementById("country-profile");
 
     try {
-      await window.ArchiveGlobe.create(container, async country => {
-        profile.innerHTML = UI.status(
-          country.code
-            ? `Loading economic indicators for ${country.name}…`
-            : `${country.name}: country code mapping is not configured. No data will be invented.`,
-          !country.code
-        );
+      if (!window.ArchiveGlobe) throw new Error("globe.js did not load");
 
-        if (!country.code) return;
+      await window.ArchiveGlobe.create(globeElement, async name => {
+        const code = countryCodes[name];
+
+        if (!code) {
+          profile.innerHTML = UI.status(
+            `${name}: no country code mapping is configured. Economic data is not available in this view.`
+          );
+          return;
+        }
+
+        profile.innerHTML = UI.status(`Loading World Bank indicators for ${name}…`);
 
         try {
-          const data = await D.loadEconomy(country.code);
-          if (currentPage !== "globe") return;
+          const data = await D.loadEconomy(code);
+          if (token !== pageToken || currentPage !== "globe") return;
 
           const labels = {
             inflation: "Inflation",
@@ -632,53 +657,47 @@
             ];
           });
 
-          profile.innerHTML = UI.panel(country.name,
-            UI.table(["Indicator", "Value", "Year", "Source"], rows));
-        } catch {
-          profile.innerHTML = UI.status("Country data could not be loaded.", true);
+          profile.innerHTML = UI.panel(name,
+            UI.table(["Indicator", "Value", "Observation year", "Source"], rows));
+        } catch (error) {
+          profile.innerHTML = UI.status(error.message, true);
         }
       });
     } catch (error) {
-      container.innerHTML = UI.status(
-        `Globe could not be loaded: ${error.message}`,
+      globeElement.innerHTML = UI.status(
+        `The globe could not be loaded: ${error.message}. Other pages remain available.`,
         true
       );
     }
   }
 
   currencySelect.addEventListener("change", () => {
-    currency = currencySelect.value;
-    UI.setCurrency(currency);
-    showPage(currentPage);
+    displayCurrency = currencySelect.value;
+    render(currentPage);
   });
 
   async function initialize() {
-    document.getElementById("update-time").textContent =
-      "Loading financial data…";
-
+    updateStatus.textContent = "Loading public financial data…";
     const result = await D.refresh();
 
-    const errors = Object.keys(result.errors);
-    document.getElementById("update-time").textContent =
-      errors.length
-        ? `Some sources unavailable · ${new Date().toLocaleString()}`
-        : `Data refreshed · ${new Date().toLocaleString()}`;
+    const failures = Object.keys(result.errors);
+    updateStatus.textContent = failures.length
+      ? `Some data sources unavailable · ${new Date().toLocaleString()}`
+      : `Data refreshed · ${new Date().toLocaleString()}`;
 
-    showPage("overview");
+    render("overview");
   }
 
   window.ArchiveApp = {
-    showPage,
+    render,
     refresh: initialize,
     get currency() {
-      return currency;
+      return displayCurrency;
     }
   };
 
   initialize().catch(error => {
-    content.innerHTML = UI.status(
-      `Application initialization failed: ${error.message}`,
-      true
-    );
+    content.innerHTML = UI.status(`Startup error: ${error.message}`, true);
+    updateStatus.textContent = "Startup incomplete";
   });
 })();
