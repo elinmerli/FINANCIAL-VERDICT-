@@ -1,4 +1,4 @@
-/* THE MONETARY ARCHIVE — DATA ENGINE */
+
 (() => {
   "use strict";
 
@@ -9,7 +9,7 @@
     worldBank: "https://api.worldbank.org/v2"
   };
 
-  const supported = [
+  const currencies = [
     "USD","EUR","GBP","CHF","JPY","PLN","CAD","AUD",
     "CNY","INR","BRL","SEK","NOK","DKK","CZK","HUF"
   ];
@@ -18,15 +18,13 @@
     rates: {},
     rateDate: null,
     gold: null,
-    goldDate: null,
     bitcoin: null,
     bitcoinHistory: [],
-    economy: {},
     errors: {},
-    lastUpdated: null
+    updated: null
   };
 
-  async function get(url, source, timeout = 15000) {
+  async function request(url, source, timeout = 18000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
 
@@ -34,16 +32,18 @@
       const response = await fetch(url, {
         signal: controller.signal,
         cache: "no-store",
-        headers: { "Accept": "application/json" }
+        headers: { Accept: "application/json" }
       });
 
       if (!response.ok) {
-        throw new Error(`${source}: HTTP ${response.status}`);
+        throw new Error(`HTTP ${response.status}`);
       }
 
       return await response.json();
     } catch (error) {
-      state.errors[source] = error.message || "Ошибка соединения";
+      state.errors[source] = error.name === "AbortError"
+        ? "Request timed out"
+        : error.message;
       throw error;
     } finally {
       clearTimeout(timer);
@@ -51,68 +51,67 @@
   }
 
   async function loadRates(base = "EUR") {
-    const url = `${API.fx}/latest?base=${encodeURIComponent(base)}`;
-    const data = await get(url, "Валюты");
+    const data = await request(
+      `${API.fx}/latest?base=${encodeURIComponent(base)}`,
+      "Currency rates"
+    );
 
     if (!data || !data.rates || !data.date) {
-      throw new Error("Сервис валют вернул некорректные данные");
+      throw new Error("Invalid currency response");
     }
 
-    state.rates = {
-      ...data.rates,
-      [data.base]: 1
-    };
+    state.rates = { ...data.rates, [data.base]: 1 };
     state.rateDate = data.date;
     return data;
   }
 
   function convert(amount, from, to) {
-    const value = Number(amount);
-    if (!Number.isFinite(value)) return null;
-    if (from === to) return value;
+    amount = Number(amount);
 
-    const rates = state.rates;
-    const fromRate = rates[from];
-    const toRate = rates[to];
+    if (!Number.isFinite(amount)) return null;
+    if (from === to) return amount;
 
-    if (!Number.isFinite(fromRate) || !Number.isFinite(toRate) || toRate === 0) {
+    const fromRate = state.rates[from];
+    const toRate = state.rates[to];
+
+    if (!Number.isFinite(fromRate) || !Number.isFinite(toRate)) {
       return null;
     }
 
-    return value * toRate / fromRate;
+    return amount * toRate / fromRate;
   }
 
   async function loadGold() {
-    const data = await get(
+    const data = await request(
       `${API.nbp}/cenyzlota/last/30/?format=json`,
-      "Золото"
+      "Gold"
     );
 
     if (!Array.isArray(data) || !data.length) {
-      throw new Error("NBP не вернул данные о золоте");
+      throw new Error("No gold observations returned");
     }
 
     const latest = data[data.length - 1];
 
     state.gold = {
-      plnPerGram: Number(latest.cena),
+      pricePLN: Number(latest.cena),
       date: latest.data,
       source: "Narodowy Bank Polski"
     };
-    state.goldDate = latest.data;
 
     return state.gold;
   }
 
   async function loadBitcoin() {
-    const data = await get(
+    const data = await request(
       `${API.crypto}/tickers/btc-bitcoin?quotes=USD`,
       "Bitcoin"
     );
 
     const quote = data?.quotes?.USD;
+
     if (!quote || !Number.isFinite(Number(quote.price))) {
-      throw new Error("Сервис Bitcoin вернул неполные данные");
+      throw new Error("Bitcoin price unavailable");
     }
 
     state.bitcoin = {
@@ -130,33 +129,33 @@
 
   async function loadBitcoinHistory(days = 30) {
     const start = new Date();
-    start.setDate(start.getDate() - Number(days));
+    start.setDate(start.getDate() - days);
 
     const date = start.toISOString().slice(0, 10);
     const url =
       `${API.crypto}/tickers/btc-bitcoin/historical` +
       `?start=${date}&interval=24h&quote=usd&limit=366`;
 
-    const data = await get(url, "История Bitcoin");
+    const data = await request(url, "Bitcoin history");
 
     if (!Array.isArray(data)) {
-      throw new Error("История Bitcoin недоступна");
+      throw new Error("Invalid Bitcoin history response");
     }
 
     state.bitcoinHistory = data
       .map(item => ({
         date: item.timestamp,
-        price: Number(item.price)
+        priceUSD: Number(item.price)
       }))
-      .filter(item => Number.isFinite(item.price));
+      .filter(item => Number.isFinite(item.priceUSD));
 
     return state.bitcoinHistory;
   }
 
   async function loadGoldHistory() {
-    const data = await get(
+    const data = await request(
       `${API.nbp}/cenyzlota/last/30/?format=json`,
-      "История золота"
+      "Gold history"
     );
 
     return data.map(item => ({
@@ -168,81 +167,67 @@
   async function loadEconomy(country = "USA") {
     const indicators = {
       inflation: "FP.CPI.TOTL.ZG",
-      gdp: "NY.GDP.MKTP.KD.ZG",
+      gdpGrowth: "NY.GDP.MKTP.KD.ZG",
       unemployment: "SL.UEM.TOTL.ZS",
       gdpPerCapita: "NY.GDP.PCAP.CD"
     };
 
     const result = {};
 
-    await Promise.all(Object.entries(indicators).map(async ([key, code]) => {
+    await Promise.all(Object.entries(indicators).map(async ([name, code]) => {
       try {
         const url =
           `${API.worldBank}/country/${encodeURIComponent(country)}` +
           `/indicator/${code}?format=json&per_page=20`;
 
-        const response = await get(url, `Экономика: ${key}`);
+        const response = await request(url, `World Bank ${name}`);
         const rows = response?.[1];
 
         if (!Array.isArray(rows)) {
-          result[key] = null;
+          result[name] = null;
           return;
         }
 
         const latest = rows.find(row => row.value !== null);
 
-        result[key] = latest ? {
+        result[name] = latest ? {
           value: Number(latest.value),
           year: latest.date,
-          country: latest.country?.value || country,
-          indicator: code,
-          source: "World Bank"
+          source: "World Bank",
+          indicator: code
         } : null;
       } catch {
-        result[key] = null;
+        result[name] = null;
       }
     }));
 
-    state.economy[country] = result;
     return result;
-  }
-
-  async function loadCountryProfile(country) {
-    const [economy] = await Promise.all([
-      loadEconomy(country)
-    ]);
-
-    return {
-      country,
-      economy,
-      currency: null,
-      source: "World Bank"
-    };
   }
 
   async function refresh() {
     state.errors = {};
 
-    const tasks = await Promise.allSettled([
+    const results = await Promise.allSettled([
       loadRates("EUR"),
       loadGold(),
       loadBitcoin(),
       loadBitcoinHistory(30)
     ]);
 
-    state.lastUpdated = new Date().toISOString();
+    state.updated = new Date().toISOString();
 
     return {
-      results: tasks,
-      state,
-      errors: { ...state.errors }
+      results,
+      errors: { ...state.errors },
+      state
     };
   }
 
   window.ArchiveData = {
+    API,
+    currencies,
     state,
-    supported,
-    get,
+    request,
     loadRates,
     convert,
     loadGold,
@@ -250,7 +235,6 @@
     loadBitcoinHistory,
     loadGoldHistory,
     loadEconomy,
-    loadCountryProfile,
     refresh
   };
 })();
