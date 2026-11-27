@@ -1,169 +1,107 @@
-/* ============================================================
+
+/* =========================================================
    THE MONETARY ARCHIVE
-   MAIN APPLICATION ENGINE
-   Version: 1.0.0
+   MAIN APPLICATION
+   ========================================================= */
 
-   Responsibilities:
-   - Dashboard initialization
-   - Currency selection and conversion
-   - Bitcoin market data
-   - Gold price display
-   - Economic indicators
-   - Charts
-   - Tables and filters
-   - Navigation
-   - Financial calculators
-   - CSV export
-   - Automatic refresh
-   - Error handling
-   ============================================================ */
-
-(() => {
+(function () {
     "use strict";
 
+    const DATA = window.ArchiveData;
 
-    /* ========================================================
-       01. CONFIGURATION
-    ======================================================== */
-
-    const CONFIG = {
-
-        defaultCurrency: "USD",
-
-        refreshInterval: 5 * 60 * 1000,
-
-        bitcoinRefreshInterval: 60 * 1000,
-
-        bitcoinHistoryDays: 30,
-
-        bitcoinApi:
-            "https://api.coingecko.com/api/v3",
-
-        chartColors: {
-            gold: "#c5a46d",
-            green: "#79a88b",
-            red: "#bd7777",
-            blue: "#7895b8",
-            muted: "#8c8a83",
-            grid: "rgba(197, 164, 109, 0.12)"
-        },
-
-        currencies: [
-            "USD",
-            "EUR",
-            "GBP",
-            "CHF",
-            "JPY",
-            "CAD",
-            "AUD",
-            "PLN",
-            "CZK",
-            "SEK",
-            "NOK",
-            "DKK",
-            "HUF"
-        ],
-
-        currencyNames: {
-            USD: "US Dollar",
-            EUR: "Euro",
-            GBP: "British Pound",
-            CHF: "Swiss Franc",
-            JPY: "Japanese Yen",
-            CAD: "Canadian Dollar",
-            AUD: "Australian Dollar",
-            PLN: "Polish Zloty",
-            CZK: "Czech Koruna",
-            SEK: "Swedish Krona",
-            NOK: "Norwegian Krone",
-            DKK: "Danish Krone",
-            HUF: "Hungarian Forint"
-        },
-
-        countryNames: {
-            PL: "Poland",
-            US: "United States",
-            EU: "European Union"
-        },
-
-        chartDefaults: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: {
-                duration: 500
-            },
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    backgroundColor: "#11151c",
-                    titleColor: "#d8c29a",
-                    bodyColor: "#f0eee8",
-                    borderColor: "rgba(197, 164, 109, 0.35)",
-                    borderWidth: 1,
-                    padding: 12
-                }
-            },
-            scales: {
-                x: {
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        color: "#8c8a83"
-                    }
-                },
-                y: {
-                    grid: {
-                        color: "rgba(197, 164, 109, 0.10)"
-                    },
-                    ticks: {
-                        color: "#8c8a83"
-                    }
-                }
-            }
+    const state = {
+        country: "PL",
+        currency: "USD",
+        activePage: "dashboard",
+        activeChart: "currencies",
+        chartPeriod: "30d",
+        charts: {},
+        dashboard: null,
+        rates: null,
+        lastUpdate: null,
+        settings: {
+            autoRefresh: true,
+            refreshInterval: 300000,
+            animations: true,
+            currency: "USD"
         }
     };
 
 
-    /* ========================================================
-       02. APPLICATION STATE
-    ======================================================== */
-
-    const state = {
-
-        dashboard: null,
-
-        selectedCurrency: CONFIG.defaultCurrency,
-
-        selectedCountry: "PL",
-
-        selectedPeriod: 30,
-
-        bitcoin: null,
-
-        bitcoinHistory: null,
-
-        charts: {},
-
-        lastDashboardUpdate: null,
-
-        lastBitcoinUpdate: null,
-
-        isLoading: false,
-
-        isRefreshing: false,
-
-        errors: [],
-
-        activeSection: "overview"
+    const FLAGS = {
+        USD: "🇺🇸",
+        EUR: "🇪🇺",
+        GBP: "🇬🇧",
+        CHF: "🇨🇭",
+        PLN: "🇵🇱",
+        JPY: "🇯🇵",
+        CAD: "🇨🇦",
+        AUD: "🇦🇺",
+        CNY: "🇨🇳",
+        INR: "🇮🇳",
+        BRL: "🇧🇷",
+        SEK: "🇸🇪",
+        NOK: "🇳🇴",
+        DKK: "🇩🇰",
+        CZK: "🇨🇿",
+        HUF: "🇭🇺"
     };
 
 
-    /* ========================================================
-       03. DOM HELPERS
-    ======================================================== */
+    const CURRENCY_NAMES = {
+        USD: "US Dollar",
+        EUR: "Euro",
+        GBP: "Pound Sterling",
+        CHF: "Swiss Franc",
+        PLN: "Polish Zloty",
+        JPY: "Japanese Yen",
+        CAD: "Canadian Dollar",
+        AUD: "Australian Dollar",
+        CNY: "Chinese Yuan",
+        INR: "Indian Rupee",
+        BRL: "Brazilian Real",
+        SEK: "Swedish Krona",
+        NOK: "Norwegian Krone",
+        DKK: "Danish Krone",
+        CZK: "Czech Koruna",
+        HUF: "Hungarian Forint"
+    };
+
+
+    const COUNTRY_NAMES = {
+        PL: "Poland",
+        US: "United States",
+        GB: "United Kingdom",
+        DE: "Germany",
+        FR: "France",
+        CH: "Switzerland",
+        JP: "Japan",
+        CN: "China",
+        IN: "India",
+        BR: "Brazil",
+        CA: "Canada",
+        AU: "Australia",
+        IT: "Italy",
+        ES: "Spain",
+        NL: "Netherlands",
+        SE: "Sweden",
+        NO: "Norway",
+        DK: "Denmark",
+        CZ: "Czechia",
+        HU: "Hungary"
+    };
+
+
+    const WORLD_BANK_COUNTRIES = [
+        "PL", "US", "GB", "DE", "FR",
+        "CH", "JP", "CN", "IN", "BR",
+        "CA", "AU", "IT", "ES", "NL"
+    ];
+
+
+    /* =====================================================
+       DOM HELPERS
+    ===================================================== */
 
     function $(selector, parent = document) {
         return parent.querySelector(selector);
@@ -171,14 +109,12 @@
 
 
     function $all(selector, parent = document) {
-        return Array.from(
-            parent.querySelectorAll(selector)
-        );
+        return Array.from(parent.querySelectorAll(selector));
     }
 
 
-    function setText(selector, value) {
-        const element = $(selector);
+    function setText(id, value) {
+        const element = document.getElementById(id);
 
         if (element) {
             element.textContent = value;
@@ -186,1935 +122,2098 @@
     }
 
 
-    function setHTML(selector, value) {
-        const element = $(selector);
-
-        if (element) {
-            element.innerHTML = value;
-        }
-    }
-
-
-    function setValue(selector, value) {
-        const element = $(selector);
-
-        if (element) {
-            element.value = value;
-        }
-    }
-
-
-    function showElement(element) {
-        if (element) {
-            element.style.display = "";
-        }
-    }
-
-
-    function hideElement(element) {
-        if (element) {
-            element.style.display = "none";
-        }
-    }
-
-
-    function isNumber(value) {
-        return (
-            typeof value === "number" &&
-            Number.isFinite(value)
-        );
-    }
-
-
-    function safeArray(value) {
-        return Array.isArray(value) ? value : [];
-    }
-
-
-    function safeNumber(value, fallback = null) {
-        const number = Number(value);
-
-        return Number.isFinite(number)
-            ? number
-            : fallback;
-    }
-
-
-    function escapeHTML(value) {
-        return String(value ?? "").replace(
-            /[&<>"']/g,
-            character => ({
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#039;"
-            })[character]
-        );
-    }
-
-
-    function dispatchEvent(name, detail = {}) {
-        window.dispatchEvent(
-            new CustomEvent(name, {
-                detail
-            })
-        );
-    }
-
-
-    /* ========================================================
-       04. NOTIFICATIONS AND STATUS
-    ======================================================== */
-
     function showNotification(message, type = "info") {
-        let container = $("#archive-notifications");
+        const container = $("#notificationContainer");
 
-        if (!container) {
-            container = document.createElement("div");
-
-            container.id = "archive-notifications";
-
-            container.className = "archive-notifications";
-
-            document.body.appendChild(container);
-        }
+        if (!container) return;
 
         const notification = document.createElement("div");
 
-        notification.className =
-            `archive-notification archive-notification-${type}`;
-
+        notification.className = `notification ${type}`;
         notification.textContent = message;
 
         container.appendChild(notification);
 
-        requestAnimationFrame(() => {
-            notification.classList.add("visible");
-        });
-
-        window.setTimeout(() => {
-            notification.classList.remove("visible");
-
-            window.setTimeout(() => {
-                notification.remove();
-            }, 300);
-
+        window.setTimeout(function () {
+            notification.remove();
         }, 4500);
     }
 
 
-    function setLoading(isLoading) {
-        state.isLoading = isLoading;
-
-        document.body.classList.toggle(
-            "archive-loading",
-            isLoading
-        );
-
-        $all("[data-loading]").forEach(element => {
-            element.classList.toggle(
-                "is-loading",
-                isLoading
-            );
-        });
+    function setApplicationStatus(message) {
+        setText("applicationStatus", message);
     }
 
 
-    function updateConnectionStatus(status, message) {
-        const element = $(
-            "#connection-status, [data-connection-status]"
-        );
+    function setConnectionStatus(online, message) {
+        const indicator = $("#connectionStatus");
 
-        if (!element) {
-            return;
-        }
+        if (!indicator) return;
 
-        element.dataset.status = status;
+        indicator.classList.toggle("offline", !online);
 
-        element.textContent = message;
-    }
-
-
-    function updateLastUpdated(date) {
-        if (!date) {
-            return;
-        }
-
-        const formatted = formatDateTime(date);
-
-        setText("#last-updated", formatted);
-
-        setText("[data-last-updated]", formatted);
-    }
-
-
-    /* ========================================================
-       05. DATE AND NUMBER FORMATTING
-    ======================================================== */
-
-    function formatDate(dateValue) {
-        if (!dateValue) {
-            return "—";
-        }
-
-        const date = new Date(dateValue);
-
-        if (Number.isNaN(date.getTime())) {
-            return "—";
-        }
-
-        return new Intl.DateTimeFormat("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric"
-        }).format(date);
-    }
-
-
-    function formatDateTime(dateValue) {
-        if (!dateValue) {
-            return "—";
-        }
-
-        const date = new Date(dateValue);
-
-        if (Number.isNaN(date.getTime())) {
-            return "—";
-        }
-
-        return new Intl.DateTimeFormat("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-        }).format(date);
-    }
-
-
-    function formatNumber(value, digits = 2) {
-        if (!isNumber(value)) {
-            return "—";
-        }
-
-        return new Intl.NumberFormat("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: digits
-        }).format(value);
-    }
-
-
-    function formatPercent(value) {
-        if (!isNumber(value)) {
-            return "—";
-        }
-
-        const sign = value > 0 ? "+" : "";
-
-        return `${sign}${formatNumber(value, 2)}%`;
-    }
-
-
-    function formatCurrency(value, currency = state.selectedCurrency) {
-        if (!isNumber(value)) {
-            return "—";
-        }
-
-        try {
-            return new Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency,
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }).format(value);
-
-        } catch {
-            return `${formatNumber(value)} ${currency}`;
-        }
-    }
-
-
-    function formatCompactCurrency(value) {
-        if (!isNumber(value)) {
-            return "—";
-        }
-
-        try {
-            return new Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency: state.selectedCurrency,
-                notation: "compact",
-                maximumFractionDigits: 2
-            }).format(value);
-
-        } catch {
-            return formatCurrency(value);
-        }
-    }
-
-
-    /* ========================================================
-       06. CURRENCY CONVERSION
-    ======================================================== */
-
-    function getCurrencyRates() {
-        return safeArray(
-            state.dashboard?.currencies
+        setText(
+            "connectionText",
+            message || (online ? "Connected" : "Unavailable")
         );
     }
 
 
-    function getPLNRate(currency) {
-        if (currency === "PLN") {
-            return 1;
-        }
+    function safeNumber(value) {
+        const number = Number(value);
 
-        const rate = getCurrencyRates().find(item => {
-            return item.code === currency;
-        });
-
-        return rate
-            ? safeNumber(rate.value)
+        return Number.isFinite(number)
+            ? number
             : null;
     }
 
 
-    /*
-     * NBP values represent PLN for one unit of foreign currency.
-     *
-     * Example:
-     * 1 USD = 4 PLN
-     * 1 EUR = 4.3 PLN
-     *
-     * To convert USD to EUR:
-     * USD amount * USD PLN rate / EUR PLN rate.
-     */
+    function formatMoney(value, currency = state.currency) {
+        const number = safeNumber(value);
 
-    function convertCurrency(
-        amount,
-        fromCurrency,
-        toCurrency
-    ) {
-        const value = safeNumber(amount);
+        if (number === null) return "Unavailable";
 
-        if (value === null) {
-            return null;
-        }
-
-        if (fromCurrency === toCurrency) {
-            return value;
-        }
-
-        const fromRate = getPLNRate(fromCurrency);
-
-        const toRate = getPLNRate(toCurrency);
-
-        if (
-            fromRate === null ||
-            toRate === null ||
-            toRate === 0
-        ) {
-            return null;
-        }
-
-        const amountInPLN = value * fromRate;
-
-        return amountInPLN / toRate;
-    }
-
-
-    function convertFromPLN(amount, currency) {
-        return convertCurrency(
-            amount,
-            "PLN",
-            currency
-        );
-    }
-
-
-    function convertToPLN(amount, currency) {
-        return convertCurrency(
-            amount,
-            currency,
-            "PLN"
-        );
-    }
-
-
-    function getCurrencySymbol(currency) {
         try {
-            return new Intl.NumberFormat("en-US", {
+            return new Intl.NumberFormat(undefined, {
                 style: "currency",
-                currency
-            })
-                .formatToParts(0)
-                .find(part => part.type === "currency")
-                ?.value || currency;
+                currency: currency,
+                maximumFractionDigits: currency === "JPY" ? 0 : 2
+            }).format(number);
 
-        } catch {
-            return currency;
+        } catch (_) {
+            return `${number.toLocaleString()} ${currency}`;
         }
     }
 
 
-    /* ========================================================
-       07. CURRENCY SELECTOR
-    ======================================================== */
+    function formatCompact(value, currency = state.currency) {
+        const number = safeNumber(value);
 
-    function initializeCurrencySelector() {
-        const selectors = $all(
-            "#currency-select, " +
-            "#display-currency, " +
-            "[data-currency-selector]"
+        if (number === null) return "Unavailable";
+
+        try {
+            return new Intl.NumberFormat(undefined, {
+                style: "currency",
+                currency: currency,
+                notation: "compact",
+                maximumFractionDigits: 2
+            }).format(number);
+
+        } catch (_) {
+            return `${number.toLocaleString()} ${currency}`;
+        }
+    }
+
+
+    function formatPercent(value) {
+        const number = safeNumber(value);
+
+        return number === null
+            ? "Unavailable"
+            : `${number.toFixed(2)}%`;
+    }
+
+
+    function formatDate(value) {
+        if (!value) return "Unavailable";
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return String(value);
+        }
+
+        return date.toLocaleDateString();
+    }
+
+
+    function formatDateTime(value) {
+        if (!value) return "Unavailable";
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return "Unavailable";
+        }
+
+        return date.toLocaleString();
+    }
+
+
+    function latestValue(values) {
+        if (!Array.isArray(values) || !values.length) {
+            return null;
+        }
+
+        return values[values.length - 1];
+    }
+
+
+    function safeLatest(values) {
+        const item = latestValue(values);
+
+        return item && safeNumber(item.value) !== null
+            ? item
+            : null;
+    }
+
+
+    function setChange(element, value, suffix = "%") {
+        if (!element) return;
+
+        const number = safeNumber(value);
+
+        if (number === null) {
+            element.textContent = "Unavailable";
+            element.className = "metric-change";
+            return;
+        }
+
+        const positive = number >= 0;
+
+        element.textContent =
+            `${positive ? "▲" : "▼"} ${Math.abs(number).toFixed(2)}${suffix}`;
+
+        element.className = `metric-change ${positive ? "positive" : "negative"}`;
+    }
+
+
+    function showValue(value, formatter = String) {
+        return value === null || value === undefined
+            ? "Unavailable"
+            : formatter(value);
+    }
+
+
+    /* =====================================================
+       NAVIGATION
+    ===================================================== */
+
+    function openPage(pageName) {
+        const page = document.querySelector(
+            `[data-section="${pageName}"]`
         );
 
-        selectors.forEach(selector => {
-            if (selector.dataset.initialized === "true") {
-                return;
+        if (!page) {
+            showNotification("This section does not exist.", "error");
+            return;
+        }
+
+        state.activePage = pageName;
+
+        $all(".page-section").forEach(function (section) {
+            section.classList.toggle(
+                "active",
+                section.dataset.section === pageName
+            );
+        });
+
+        $all(".nav-item").forEach(function (button) {
+            button.classList.toggle(
+                "active",
+                button.dataset.page === pageName
+            );
+        });
+
+        if (pageName === "globe") {
+            if (window.ArchiveGlobe) {
+                window.ArchiveGlobe.init();
             }
+        }
 
-            selector.dataset.initialized = "true";
+        if (pageName === "currencies") {
+            renderCurrenciesTable();
+        }
 
-            if (!selector.options.length) {
-                selector.innerHTML = CONFIG.currencies
-                    .map(currency => {
-                        const name =
-                            CONFIG.currencyNames[currency] ||
-                            currency;
+        if (pageName === "gold") {
+            loadGoldPage();
+        }
 
-                        return `
-                            <option value="${currency}">
-                                ${currency} — ${name}
-                            </option>
-                        `;
-                    })
-                    .join("");
-            }
+        if (pageName === "bitcoin") {
+            loadBitcoinPage();
+        }
 
-            selector.value = state.selectedCurrency;
+        if (pageName === "inflation") {
+            loadInflationPage();
+        }
 
-            selector.addEventListener("change", () => {
-                changeCurrency(selector.value);
+        if (pageName === "economy") {
+            loadEconomyPage();
+        }
+
+        if (pageName === "history") {
+            renderHistory();
+        }
+
+        if (pageName === "settings") {
+            renderSettings();
+        }
+
+        window.scrollTo({
+            top: 0,
+            behavior: state.settings.animations ? "smooth" : "auto"
+        });
+    }
+
+
+    function installNavigation() {
+        $all(".nav-item").forEach(function (button) {
+            button.addEventListener("click", function () {
+                openPage(button.dataset.page);
             });
         });
     }
 
 
-    function changeCurrency(currency) {
-        const code = String(currency || "").toUpperCase();
+    /* =====================================================
+       CLOCK
+    ===================================================== */
 
-        if (!CONFIG.currencies.includes(code)) {
-            showNotification(
-                "This display currency is not supported.",
-                "warning"
+    function updateClock() {
+        const now = new Date();
+
+        setText(
+            "currentDate",
+            now.toLocaleDateString()
+        );
+
+        setText(
+            "currentTime",
+            now.toLocaleTimeString()
+        );
+    }
+
+
+    /* =====================================================
+       DASHBOARD
+    ===================================================== */
+
+    async function loadDashboard() {
+        setApplicationStatus("Loading financial information...");
+
+        try {
+            const dashboard = await DATA.loadDashboard(
+                state.country,
+                state.currency
             );
+
+            state.dashboard = dashboard;
+            state.rates = dashboard.rates;
+
+            const usable = [
+                dashboard.rates,
+                dashboard.gold,
+                dashboard.bitcoin,
+                dashboard.economy
+            ].some(item => item && !item.error);
+
+            setConnectionStatus(
+                usable,
+                usable ? "Connected" : "Data unavailable"
+            );
+
+            await renderDashboard(dashboard);
+
+            state.lastUpdate = new Date();
+
+            setText(
+                "footerUpdateTime",
+                `Last update: ${state.lastUpdate.toLocaleTimeString()}`
+            );
+
+            setApplicationStatus(
+                "Archive ready. Data availability depends on source."
+            );
+
+        } catch (error) {
+            console.error("[Archive] Dashboard error:", error);
+
+            setConnectionStatus(false, "Unavailable");
+
+            setApplicationStatus("Could not load dashboard.");
+
+            showNotification(
+                "Some financial data could not be loaded.",
+                "error"
+            );
+        }
+    }
+
+
+    async function renderDashboard(data) {
+        await Promise.allSettled([
+            renderDashboardRates(data.rates),
+            renderDashboardGold(data.gold),
+            renderDashboardBitcoin(data.bitcoin),
+            renderDashboardEconomy(data.economy),
+            renderDashboardIndicators(data.economy),
+            renderMarketOverview(data.bitcoin)
+        ]);
+
+        renderCalendarUnavailable();
+
+        renderDashboardChart();
+    }
+
+
+    /* =====================================================
+       DASHBOARD EXCHANGE RATES
+    ===================================================== */
+
+    async function renderDashboardRates(rates) {
+        const container = $("#dashboardExchangeRates");
+
+        if (!container) return;
+
+        if (!rates || !Array.isArray(rates.rows)) {
+            container.innerHTML =
+                '<div class="empty-state">Exchange rates unavailable.</div>';
 
             return;
         }
 
-        state.selectedCurrency = code;
+        const preferred = ["USD", "EUR", "GBP", "CHF"];
 
-        $all(
-            "#currency-select, " +
-            "#display-currency, " +
-            "[data-currency-selector]"
-        ).forEach(selector => {
-            selector.value = code;
+        const rows = preferred.map(code =>
+            rates.rows.find(item => item.code === code)
+        ).filter(Boolean);
+
+        container.replaceChildren();
+
+        rows.forEach(function (item) {
+            const row = document.createElement("div");
+
+            row.className = "exchange-row";
+
+            const flag = document.createElement("span");
+            flag.className = "exchange-flag";
+            flag.textContent = FLAGS[item.code] || "🌐";
+
+            const code = document.createElement("span");
+            code.className = "exchange-code";
+            code.textContent = item.code;
+
+            const value = document.createElement("strong");
+            value.className = "exchange-value";
+            value.textContent = item.rate.toFixed(4);
+
+            const change = document.createElement("span");
+            change.className = "exchange-change";
+
+            if (item.change === null) {
+                change.textContent = "—";
+            } else {
+                change.textContent =
+                    `${item.change >= 0 ? "▲" : "▼"} ${Math.abs(item.change).toFixed(2)}%`;
+
+                change.classList.add(
+                    item.change >= 0 ? "positive" : "negative"
+                );
+            }
+
+            row.append(flag, code, value, change);
+            container.appendChild(row);
         });
 
-        localStorage.setItem(
-            "archive-display-currency",
-            code
+        setText(
+            "ratesUpdated",
+            `NBP observation: ${rates.date || "Unavailable"}`
+        );
+    }
+
+
+    /* =====================================================
+       GOLD
+    ===================================================== */
+
+    async function renderDashboardGold(gold) {
+        if (!gold || gold.pricePerGramPLN === null) {
+            setText("dashboardGoldPrice", "Unavailable");
+            setText("goldUpdated", "No data");
+            return;
+        }
+
+        try {
+            const converted = await DATA.convertPLNValue(
+                gold.pricePerGramPLN,
+                state.currency
+            );
+
+            setText(
+                "dashboardGoldPrice",
+                formatMoney(converted, state.currency)
+            );
+
+            setText(
+                "goldUpdated",
+                formatDate(gold.date)
+            );
+
+            setText(
+                "goldSource",
+                gold.source
+            );
+
+            const ouncePLN = gold.pricePerGramPLN * 31.1034768;
+
+            const ounce = await DATA.convertPLNValue(
+                ouncePLN,
+                state.currency
+            );
+
+            setText(
+                "goldGramPrice",
+                formatMoney(converted, state.currency)
+            );
+
+            setText(
+                "goldOuncePrice",
+                formatMoney(ounce, state.currency)
+            );
+
+            setChange($("#dashboardGoldChange"), null);
+
+            renderGoldMiniChart();
+
+        } catch (error) {
+            console.error(error);
+
+            setText("dashboardGoldPrice", "Unavailable");
+        }
+    }
+
+
+    async function loadGoldPage() {
+        try {
+            const gold = await DATA.fetchGoldCurrent();
+
+            await renderDashboardGold(gold);
+
+            const currency = $("#goldHistoryCurrency")?.value || state.currency;
+
+            await renderGoldHistoryChart(currency, 30);
+
+        } catch (error) {
+            showNotification("Gold data is temporarily unavailable.", "error");
+        }
+    }
+
+
+    async function renderGoldMiniChart() {
+        try {
+            const history = await DATA.fetchGoldHistory(30);
+
+            createChart("goldMiniChart", {
+                type: "line",
+                labels: history.map(item => item.date),
+                values: history.map(item => item.value),
+                color: "#e5aa54",
+                compact: true
+            });
+
+        } catch (error) {
+            console.warn("Gold mini chart unavailable:", error);
+        }
+    }
+
+
+    async function renderGoldHistoryChart(currency, days) {
+        const history = await DATA.fetchGoldHistory(days);
+
+        const converted = await Promise.all(
+            history.map(item =>
+                DATA.convertPLNValue(item.value, currency)
+            )
         );
 
-        renderDashboard();
-
-        renderBitcoin();
-
-        renderCurrencyTable();
-
-        renderGold();
-
-        updateCalculatorCurrency();
-
-        dispatchEvent("archive:currency-changed", {
-            currency: code
+        createChart("goldHistoryChart", {
+            type: "line",
+            labels: history.map(item => item.date),
+            values: converted,
+            color: "#e5aa54"
         });
     }
 
 
-    function restoreCurrencyPreference() {
+    /* =====================================================
+       BITCOIN
+    ===================================================== */
+
+    async function renderDashboardBitcoin(bitcoin) {
+        if (!bitcoin || bitcoin.price === null) {
+            setText("dashboardBitcoinPrice", "Unavailable");
+            setText("bitcoinUpdated", "No data");
+            return;
+        }
+
+        setText(
+            "dashboardBitcoinPrice",
+            formatMoney(bitcoin.price, bitcoin.currency)
+        );
+
+        setText(
+            "dashboardBitcoinChange",
+            bitcoin.change24h === null
+                ? "Unavailable"
+                : `${bitcoin.change24h >= 0 ? "▲" : "▼"} ${Math.abs(bitcoin.change24h).toFixed(2)}%`
+        );
+
+        setChange(
+            $("#dashboardBitcoinChange"),
+            bitcoin.change24h
+        );
+
+        setText(
+            "bitcoinUpdated",
+            formatDateTime(bitcoin.timestamp)
+        );
+
+        renderBitcoinMiniChart();
+    }
+
+
+    async function loadBitcoinPage() {
+        const currency =
+            $("#bitcoinCurrency")?.value.toLowerCase() ||
+            state.currency.toLowerCase();
+
         try {
-            const saved = localStorage.getItem(
-                "archive-display-currency"
+            const bitcoin = await DATA.fetchBitcoinCurrent(currency);
+
+            setText(
+                "bitcoinPrice",
+                formatMoney(bitcoin.price, currency.toUpperCase())
             );
 
-            if (
-                saved &&
-                CONFIG.currencies.includes(saved)
-            ) {
-                state.selectedCurrency = saved;
+            setText(
+                "bitcoinChange",
+                formatPercent(bitcoin.change24h)
+            );
+
+            setText(
+                "bitcoinMarketCap",
+                formatCompact(bitcoin.marketCap, currency.toUpperCase())
+            );
+
+            setText(
+                "bitcoinVolume",
+                formatCompact(bitcoin.volume24h, currency.toUpperCase())
+            );
+
+            await renderBitcoinHistoryChart(currency, 7);
+
+            const market = $("#detailedMarketData");
+
+            if (market) {
+                market.innerHTML = `
+                    <div class="market-item">
+                        <span>Bitcoin</span>
+                        <strong>${formatMoney(bitcoin.price, currency.toUpperCase())}</strong>
+                        <small>${bitcoin.source}</small>
+                    </div>
+                    <div class="market-item">
+                        <span>Market capitalization</span>
+                        <strong>${formatCompact(bitcoin.marketCap, currency.toUpperCase())}</strong>
+                        <small>Reported market value</small>
+                    </div>
+                    <div class="market-item">
+                        <span>24-hour volume</span>
+                        <strong>${formatCompact(bitcoin.volume24h, currency.toUpperCase())}</strong>
+                        <small>Reported trading volume</small>
+                    </div>
+                `;
             }
 
         } catch (error) {
-            console.warn(
-                "[Archive] Currency preference unavailable:",
-                error
+            console.error(error);
+
+            showNotification(
+                "Bitcoin data is temporarily unavailable.",
+                "error"
             );
         }
     }
 
 
-    /* ========================================================
-       08. LOAD MAIN DATA
-    ======================================================== */
-
-    async function loadMainData(force = false) {
-        if (!window.ArchiveData) {
-            throw new Error(
-                "ArchiveData is not available. Check data.js."
+    async function renderBitcoinMiniChart() {
+        try {
+            const history = await DATA.fetchBitcoinHistory(
+                state.currency.toLowerCase(),
+                7
             );
-        }
 
-        if (typeof window.ArchiveData.loadDashboard !== "function") {
-            throw new Error(
-                "ArchiveData.loadDashboard() is missing."
-            );
-        }
+            createChart("bitcoinMiniChart", {
+                type: "line",
+                labels: history.map(item => item.date),
+                values: history.map(item => item.value),
+                color: "#e5aa54",
+                compact: true
+            });
 
-        const dashboard = await window.ArchiveData.loadDashboard({
-            force
+        } catch (error) {
+            console.warn(error);
+        }
+    }
+
+
+    async function renderBitcoinHistoryChart(currency, days) {
+        const history = await DATA.fetchBitcoinHistory(currency, days);
+
+        createChart("bitcoinHistoryChart", {
+            type: "line",
+            labels: history.map(item => item.date),
+            values: history.map(item => item.value),
+            color: "#e5aa54"
         });
-
-        if (!dashboard) {
-            throw new Error(
-                "The data provider returned an empty dashboard."
-            );
-        }
-
-        state.dashboard = dashboard;
-
-        state.lastDashboardUpdate =
-            dashboard.lastCheckedAt ||
-            dashboard.generatedAt ||
-            new Date().toISOString();
-
-        updateLastUpdated(state.lastDashboardUpdate);
-
-        return dashboard;
     }
 
 
-    /* ========================================================
-       09. BITCOIN DATA
-    ======================================================== */
+    /* =====================================================
+       ECONOMY
+    ===================================================== */
 
-    async function requestBitcoinData(endpoint) {
-        const response = await fetch(
-            `${CONFIG.bitcoinApi}${endpoint}`,
-            {
-                method: "GET",
-                headers: {
-                    Accept: "application/json"
-                },
-                cache: "no-store"
-            }
+    async function renderDashboardEconomy(economy) {
+        if (!economy || economy.error) {
+            setText("dashboardInflation", "Unavailable");
+            setText("dashboardGDP", "Unavailable");
+            setText("inflationUpdated", "No data");
+            setText("gdpUpdated", "No data");
+            return;
+        }
+
+        const inflation = safeLatest(economy.inflation);
+        const gdp = safeLatest(economy.gdp);
+        const unemployment = safeLatest(economy.unemployment);
+
+        setText(
+            "dashboardInflation",
+            inflation ? formatPercent(inflation.value) : "Unavailable"
         );
 
-        if (!response.ok) {
-            throw new Error(
-                `Bitcoin data request failed: HTTP ${response.status}`
-            );
+        setText(
+            "dashboardGDP",
+            gdp ? formatPercent(gdp.value) : "Unavailable"
+        );
+
+        setText(
+            "inflationCountryLabel",
+            COUNTRY_NAMES[state.country] || state.country
+        );
+
+        setText(
+            "gdpCountryLabel",
+            COUNTRY_NAMES[state.country] || state.country
+        );
+
+        setText(
+            "inflationUpdated",
+            inflation ? inflation.year : "Unavailable"
+        );
+
+        setText(
+            "gdpUpdated",
+            gdp ? gdp.year : "Unavailable"
+        );
+
+        setText(
+            "economyGDP",
+            gdp ? formatPercent(gdp.value) : "Unavailable"
+        );
+
+        setText(
+            "economyInflation",
+            inflation ? formatPercent(inflation.value) : "Unavailable"
+        );
+
+        setText(
+            "economyUnemployment",
+            unemployment
+                ? formatPercent(unemployment.value)
+                : "Unavailable"
+        );
+
+        const gdpPerCapita = safeLatest(economy.gdpPerCapita);
+
+        setText(
+            "economyGDPPerCapita",
+            gdpPerCapita
+                ? formatMoney(gdpPerCapita.value, "USD")
+                : "Unavailable"
+        );
+
+        if (inflation) {
+            createChart("inflationMiniChart", {
+                labels: economy.inflation.map(item => item.year),
+                values: economy.inflation.map(item => item.value),
+                color: "#9bd5df",
+                compact: true
+            });
         }
 
-        return response.json();
+        if (gdp) {
+            createChart("gdpMiniChart", {
+                labels: economy.gdp.map(item => item.year),
+                values: economy.gdp.map(item => item.value),
+                color: "#e6ae5d",
+                compact: true,
+                type: "bar"
+            });
+        }
     }
 
 
-    async function loadBitcoin() {
-        const currencies = [
-            "usd",
-            "eur",
-            "gbp",
-            "pln",
-            "chf",
-            "jpy",
-            "cad",
-            "aud"
+    async function renderDashboardIndicators(economy) {
+        const container = $("#dashboardIndicators");
+
+        if (!container) return;
+
+        const indicators = [
+            {
+                name: "Unemployment Rate",
+                data: economy?.unemployment,
+                unit: "%"
+            },
+            {
+                name: "Industrial Production",
+                data: null,
+                unit: ""
+            },
+            {
+                name: "Retail Sales",
+                data: null,
+                unit: ""
+            },
+            {
+                name: "GDP Growth",
+                data: economy?.gdp,
+                unit: "%"
+            }
         ];
 
-        const currencyList = currencies.join(",");
+        container.replaceChildren();
 
-        const data = await requestBitcoinData(
-            `/simple/price?ids=bitcoin&vs_currencies=${currencyList}&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`
-        );
+        indicators.forEach(function (indicator) {
+            const item = safeLatest(indicator.data);
 
-        const bitcoin = data?.bitcoin;
+            const box = document.createElement("div");
+            box.className = "indicator-item";
 
-        if (!bitcoin) {
-            throw new Error(
-                "Bitcoin price data is unavailable."
-            );
-        }
+            const label = document.createElement("span");
+            label.textContent = indicator.name;
 
-        state.bitcoin = bitcoin;
+            const value = document.createElement("strong");
+            value.textContent = item
+                ? `${item.value.toFixed(2)}${indicator.unit}`
+                : "Unavailable";
 
-        state.lastBitcoinUpdate = new Date().toISOString();
+            const year = document.createElement("small");
+            year.textContent = item ? String(item.year) : "No data";
+            year.className = "muted";
 
-        renderBitcoin();
-
-        return bitcoin;
-    }
-
-
-    function getBitcoinPrice(currency) {
-        if (!state.bitcoin) {
-            return null;
-        }
-
-        const key = currency.toLowerCase();
-
-        const directPrice = safeNumber(
-            state.bitcoin[key]
-        );
-
-        if (directPrice !== null) {
-            return directPrice;
-        }
-
-        const usdPrice = safeNumber(
-            state.bitcoin.usd
-        );
-
-        if (usdPrice === null) {
-            return null;
-        }
-
-        return convertCurrency(
-            usdPrice,
-            "USD",
-            currency
-        );
-    }
-
-
-    function getBitcoinChange() {
-        if (!state.bitcoin) {
-            return null;
-        }
-
-        const key =
-            `${state.selectedCurrency.toLowerCase()}_24h_change`;
-
-        return safeNumber(
-            state.bitcoin[key]
-        );
-    }
-
-
-    function renderBitcoin() {
-        if (!state.bitcoin) {
-            return;
-        }
-
-        const currency = state.selectedCurrency;
-
-        const price = getBitcoinPrice(currency);
-
-        const change = getBitcoinChange();
-
-        const marketCap = safeNumber(
-            state.bitcoin[
-                `${currency.toLowerCase()}_market_cap`
-            ]
-        );
-
-        const volume = safeNumber(
-            state.bitcoin[
-                `${currency.toLowerCase()}_24h_vol`
-            ]
-        );
-
-        setText(
-            "#bitcoin-price",
-            formatCurrency(price, currency)
-        );
-
-        setText(
-            "#btc-price",
-            formatCurrency(price, currency)
-        );
-
-        setText(
-            "#bitcoin-change",
-            formatPercent(change)
-        );
-
-        setText(
-            "#bitcoin-market-cap",
-            formatCompactCurrency(marketCap)
-        );
-
-        setText(
-            "#bitcoin-volume",
-            formatCompactCurrency(volume)
-        );
-
-        setText(
-            "#bitcoin-updated",
-            formatDateTime(state.lastBitcoinUpdate)
-        );
-
-        const changeElements = $all(
-            "#bitcoin-change, " +
-            "[data-bitcoin-change]"
-        );
-
-        changeElements.forEach(element => {
-            element.classList.remove(
-                "positive",
-                "negative",
-                "neutral"
-            );
-
-            element.classList.add(
-                change > 0
-                    ? "positive"
-                    : change < 0
-                        ? "negative"
-                        : "neutral"
-            );
+            box.append(label, value, year);
+            container.appendChild(box);
         });
     }
 
 
-    /* ========================================================
-       10. BITCOIN HISTORY
-    ======================================================== */
+    async function loadInflationPage() {
+        const country = $("#inflationCountry")?.value || state.country;
 
-    async function loadBitcoinHistory(days = 30) {
-        const currency =
-            state.selectedCurrency.toLowerCase();
-
-        const data = await requestBitcoinData(
-            `/coins/bitcoin/market_chart?vs_currency=${currency}&days=${days}&interval=daily`
-        );
-
-        if (!Array.isArray(data.prices)) {
-            throw new Error(
-                "Bitcoin historical prices are unavailable."
+        try {
+            const history = await DATA.fetchWorldBankIndicator(
+                country,
+                "inflation",
+                2000
             );
+
+            const current = latestValue(history);
+            const previous = history.length > 1
+                ? history[history.length - 2]
+                : null;
+
+            setText(
+                "inflationCurrent",
+                current ? formatPercent(current.value) : "Unavailable"
+            );
+
+            setText(
+                "inflationPrevious",
+                previous ? formatPercent(previous.value) : "Unavailable"
+            );
+
+            setText(
+                "inflationYear",
+                current ? current.year : "Unavailable"
+            );
+
+            createChart("inflationHistoryChart", {
+                labels: history.map(item => item.year),
+                values: history.map(item => item.value),
+                color: "#a7dce5"
+            });
+
+            await renderInflationComparison();
+
+        } catch (error) {
+            console.error(error);
+
+            showNotification("Inflation data unavailable.", "error");
         }
-
-        state.bitcoinHistory = data.prices.map(item => ({
-            timestamp: item[0],
-            date: new Date(item[0]),
-            price: item[1]
-        }));
-
-        renderBitcoinChart();
-
-        return state.bitcoinHistory;
     }
 
 
-    function renderBitcoinChart() {
-        const canvas = $(
-            "#bitcoin-chart, " +
-            "#btc-chart, " +
-            "[data-chart='bitcoin']"
+    async function renderInflationComparison() {
+        const body = $("#inflationComparisonBody");
+
+        if (!body) return;
+
+        body.innerHTML =
+            '<tr><td colspan="5">Loading country data...</td></tr>';
+
+        const results = await Promise.allSettled(
+            WORLD_BANK_COUNTRIES.map(async function (code) {
+                const history = await DATA.fetchWorldBankIndicator(
+                    code,
+                    "inflation",
+                    2015
+                );
+
+                return {
+                    code,
+                    latest: latestValue(history),
+                    previous: history.length > 1
+                        ? history[history.length - 2]
+                        : null
+                };
+            })
         );
 
-        if (!canvas || !window.Chart) {
-            return;
-        }
+        body.replaceChildren();
 
-        const history = safeArray(
-            state.bitcoinHistory
-        );
+        results.forEach(function (result, index) {
+            const row = document.createElement("tr");
 
-        if (!history.length) {
-            return;
-        }
+            const data = result.status === "fulfilled"
+                ? result.value
+                : null;
 
-        const labels = history.map(item => {
-            return new Intl.DateTimeFormat("en-US", {
-                day: "2-digit",
-                month: "short"
-            }).format(item.date);
+            const code = WORLD_BANK_COUNTRIES[index];
+
+            const values = [
+                COUNTRY_NAMES[code] || code,
+                data?.latest
+                    ? formatPercent(data.latest.value)
+                    : "Unavailable",
+                data?.previous
+                    ? formatPercent(data.previous.value)
+                    : "Unavailable",
+                data?.latest
+                    ? data.latest.year
+                    : "Unavailable",
+                "World Bank"
+            ];
+
+            values.forEach(function (value) {
+                const cell = document.createElement("td");
+                cell.textContent = value;
+                row.appendChild(cell);
+            });
+
+            body.appendChild(row);
         });
+    }
 
-        const values = history.map(item => item.price);
 
-        createChart(
-            "bitcoin",
-            canvas,
-            {
-                type: "line",
+    async function loadEconomyPage() {
+        const country = $("#economyCountry")?.value || state.country;
+        const indicator = $("#economyIndicator")?.value || "gdp";
 
-                data: {
-                    labels,
+        try {
+            const economy = await DATA.fetchCountryEconomy(country);
 
-                    datasets: [{
-                        label: `Bitcoin (${state.selectedCurrency})`,
+            const selected = economy[indicator] || [];
 
-                        data: values,
+            createChart("economyHistoryChart", {
+                labels: selected.map(item => item.year),
+                values: selected.map(item => item.value),
+                color: "#d9a85d"
+            });
 
-                        borderColor: CONFIG.chartColors.gold,
+            await renderEconomyComparison();
 
-                        backgroundColor:
-                            "rgba(197, 164, 109, 0.10)",
+        } catch (error) {
+            showNotification("Economic data unavailable.", "error");
+        }
+    }
 
-                        borderWidth: 2,
 
-                        fill: true,
+    async function renderEconomyComparison() {
+        const body = $("#economyComparisonBody");
 
-                        tension: 0.35,
+        if (!body) return;
 
-                        pointRadius: 0,
+        body.innerHTML =
+            '<tr><td colspan="5">Loading country comparisons...</td></tr>';
 
-                        pointHoverRadius: 4
-                    }]
+        const results = await DATA.fetchCountryComparisons(
+            WORLD_BANK_COUNTRIES
+        );
+
+        body.replaceChildren();
+
+        results.forEach(function (country) {
+            const row = document.createElement("tr");
+
+            const values = [
+                country.name,
+                safeLatest(country.economy.gdp),
+                safeLatest(country.economy.inflation),
+                safeLatest(country.economy.unemployment),
+                safeLatest(country.economy.gdpPerCapita)
+            ];
+
+            values.forEach(function (item, index) {
+                const cell = document.createElement("td");
+
+                if (index === 0) {
+                    cell.textContent = item;
+                } else if (!item) {
+                    cell.textContent = "Unavailable";
+                } else if (index === 4) {
+                    cell.textContent = formatMoney(item.value, "USD");
+                } else {
+                    cell.textContent = formatPercent(item.value);
+                }
+
+                row.appendChild(cell);
+            });
+
+            body.appendChild(row);
+        });
+    }
+
+
+    /* =====================================================
+       ECONOMIC CALENDAR
+    ===================================================== */
+
+    function renderCalendarUnavailable() {
+        const container = $("#economicCalendar");
+
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="empty-state">
+                No verified calendar feed is connected.
+                Economic events are not invented.
+            </div>
+        `;
+    }
+
+
+    /* =====================================================
+       MARKET OVERVIEW
+    ===================================================== */
+
+    async function renderMarketOverview(bitcoin) {
+        const container = $("#marketOverview");
+
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="market-item">
+                <span>Bitcoin</span>
+                <strong>
+                    ${bitcoin && bitcoin.price !== null
+                        ? formatMoney(bitcoin.price, bitcoin.currency)
+                        : "Unavailable"}
+                </strong>
+                <small>CoinGecko</small>
+            </div>
+
+            <div class="market-item">
+                <span>S&P 500</span>
+                <strong>Unavailable</strong>
+                <small>No live index feed connected</small>
+            </div>
+
+            <div class="market-item">
+                <span>DAX</span>
+                <strong>Unavailable</strong>
+                <small>No live index feed connected</small>
+            </div>
+        `;
+    }
+
+
+    /* =====================================================
+       CURRENCY TABLE
+    ===================================================== */
+
+    async function renderCurrenciesTable() {
+        const body = $("#currenciesTableBody");
+
+        if (!body) return;
+
+        body.innerHTML =
+            '<tr><td colspan="6">Loading currency rates...</td></tr>';
+
+        try {
+            const rates = await DATA.getExchangeRates();
+
+            state.rates = rates;
+
+            const display =
+                $("#currencyDisplay")?.value || state.currency;
+
+            const search =
+                ($("#currencySearch")?.value || "").trim().toLowerCase();
+
+            const sort = $("#currencySort")?.value || "code";
+
+            const displayRate = rates.values[display];
+
+            let rows = rates.rows.map(function (item) {
+                const value = displayRate
+                    ? item.rate / displayRate
+                    : null;
+
+                const previous = item.previousRate && displayRate
+                    ? item.previousRate / displayRate
+                    : null;
+
+                return {
+                    ...item,
+                    displayRate: value,
+                    displayPrevious: previous
+                };
+            });
+
+            rows = rows.filter(function (item) {
+                const name = CURRENCY_NAMES[item.code] || "";
+
+                return (
+                    item.code.toLowerCase().includes(search) ||
+                    name.toLowerCase().includes(search)
+                );
+            });
+
+            rows.sort(function (a, b) {
+                if (sort === "rate-asc") {
+                    return (a.displayRate || 0) - (b.displayRate || 0);
+                }
+
+                if (sort === "rate-desc") {
+                    return (b.displayRate || 0) - (a.displayRate || 0);
+                }
+
+                if (sort === "name") {
+                    return (CURRENCY_NAMES[a.code] || a.code)
+                        .localeCompare(CURRENCY_NAMES[b.code] || b.code);
+                }
+
+                return a.code.localeCompare(b.code);
+            });
+
+            body.replaceChildren();
+
+            rows.forEach(function (item) {
+                const row = document.createElement("tr");
+
+                const values = [
+                    `${FLAGS[item.code] || "🌐"} ${CURRENCY_NAMES[item.code] || item.code}`,
+                    item.code,
+                    item.displayRate === null
+                        ? "Unavailable"
+                        : item.displayRate.toFixed(5),
+                    item.displayPrevious === null
+                        ? "Unavailable"
+                        : item.displayPrevious.toFixed(5),
+                    item.change === null
+                        ? "Unavailable"
+                        : `${item.change >= 0 ? "+" : ""}${item.change.toFixed(2)}%`,
+                    item.source
+                ];
+
+                values.forEach(function (value, index) {
+                    const cell = document.createElement("td");
+                    cell.textContent = value;
+
+                    if (index === 4 && item.change !== null) {
+                        cell.classList.add(
+                            item.change >= 0 ? "positive" : "negative"
+                        );
+                    }
+
+                    row.appendChild(cell);
+                });
+
+                body.appendChild(row);
+            });
+
+            setText("currencyBase", display);
+            setText("currencyCount", rows.length);
+            setText("currencyLastUpdate", rates.date || "Unavailable");
+
+        } catch (error) {
+            console.error(error);
+
+            body.innerHTML =
+                '<tr><td colspan="6">Currency data unavailable.</td></tr>';
+        }
+    }
+
+
+    /* =====================================================
+       CURRENCY CONVERTER
+    ===================================================== */
+
+    async function convertFromForm() {
+        const amount = safeNumber($("#converterFromAmount")?.value);
+        const from = $("#converterFrom")?.value;
+        const to = $("#converterTo")?.value;
+
+        if (amount === null || amount < 0) {
+            showNotification("Enter a valid amount.", "error");
+            return;
+        }
+
+        try {
+            const result = await DATA.convertValue(amount, from, to);
+
+            setText(
+                "converterResult",
+                formatMoney(result, to)
+            );
+
+            const rate = await DATA.getCurrencyRate(from, to);
+
+            setText(
+                "converterRate",
+                `1 ${from} = ${rate.toFixed(6)} ${to}`
+            );
+
+        } catch (error) {
+            setText("converterResult", "Unavailable");
+
+            setText(
+                "converterRate",
+                error.message
+            );
+
+            showNotification(error.message, "error");
+        }
+    }
+
+
+    async function convertQuickCalculator() {
+        const amount = safeNumber($("#calcCurrencyAmount")?.value);
+        const from = $("#calcCurrencyFrom")?.value;
+        const to = $("#calcCurrencyTo")?.value;
+
+        if (amount === null || amount < 0) {
+            showNotification("Enter a valid amount.", "error");
+            return;
+        }
+
+        try {
+            const result = await DATA.convertValue(amount, from, to);
+
+            setText(
+                "calcCurrencyResult",
+                formatMoney(result, to)
+            );
+
+        } catch (error) {
+            setText("calcCurrencyResult", error.message);
+        }
+    }
+
+
+    function swapCurrencies() {
+        const from = $("#converterFrom");
+        const to = $("#converterTo");
+
+        if (!from || !to) return;
+
+        const oldFrom = from.value;
+
+        from.value = to.value;
+        to.value = oldFrom;
+
+        convertFromForm();
+    }
+
+
+    /* =====================================================
+       CHART ENGINE
+    ===================================================== */
+
+    function createChart(canvasId, options) {
+        const canvas = document.getElementById(canvasId);
+
+        if (!canvas || !window.Chart) return null;
+
+        const context = canvas.getContext("2d");
+
+        if (state.charts[canvasId]) {
+            state.charts[canvasId].destroy();
+        }
+
+        const labels = options.labels || [];
+        const values = options.values || [];
+        const color = options.color || "#d7a45e";
+
+        const gradient = context.createLinearGradient(0, 0, 0, 280);
+
+        gradient.addColorStop(0, `${color}66`);
+        gradient.addColorStop(1, `${color}00`);
+
+        state.charts[canvasId] = new Chart(context, {
+            type: options.type || "line",
+
+            data: {
+                labels: labels,
+
+                datasets: [{
+                    label: options.label || "Value",
+                    data: values,
+
+                    borderColor: color,
+                    backgroundColor: options.compact ? color : gradient,
+
+                    borderWidth: options.compact ? 1.8 : 2.5,
+
+                    fill: options.type !== "bar",
+
+                    tension: 0.32,
+
+                    pointRadius: options.compact ? 0 : 2,
+                    pointHoverRadius: 5,
+
+                    borderRadius: options.type === "bar" ? 3 : 0
+                }]
+            },
+
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+
+                animation: {
+                    duration: state.settings.animations ? 450 : 0
                 },
 
-                options: {
-                    ...CONFIG.chartDefaults,
-
-                    interaction: {
-                        intersect: false,
-                        mode: "index"
+                plugins: {
+                    legend: {
+                        display: false
                     },
 
-                    scales: {
-                        ...CONFIG.chartDefaults.scales,
+                    tooltip: {
+                        enabled: true,
+
+                        backgroundColor: "#171a22",
+                        titleColor: "#f1c47d",
+                        bodyColor: "#eeeeee",
+
+                        borderColor: "#92632d",
+                        borderWidth: 1
+                    }
+                },
+
+                scales: options.compact
+                    ? {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            display: false
+                        }
+                    }
+                    : {
+                        x: {
+                            grid: {
+                                color: "rgba(255,255,255,0.055)"
+                            },
+                            ticks: {
+                                color: "#a0a0a8",
+                                maxTicksLimit: 9
+                            }
+                        },
 
                         y: {
-                            ...CONFIG.chartDefaults.scales.y,
-
+                            grid: {
+                                color: "rgba(255,255,255,0.07)"
+                            },
                             ticks: {
-                                color: "#8c8a83",
-
-                                callback(value) {
-                                    return formatCurrency(
-                                        value,
-                                        state.selectedCurrency
-                                    );
-                                }
+                                color: "#a0a0a8"
                             }
                         }
                     }
-                }
             }
-        );
-    }
-
-
-    /* ========================================================
-       11. GOLD DATA
-    ======================================================== */
-
-    function getGoldPrice() {
-        const gold = state.dashboard?.gold;
-
-        if (!gold) {
-            return null;
-        }
-
-        const pricePLN = safeNumber(gold.value);
-
-        if (pricePLN === null) {
-            return null;
-        }
-
-        return convertFromPLN(
-            pricePLN,
-            state.selectedCurrency
-        );
-    }
-
-
-    function renderGold() {
-        const gold = state.dashboard?.gold;
-
-        if (!gold) {
-            setText("#gold-price", "Unavailable");
-            return;
-        }
-
-        const pricePerGram = getGoldPrice();
-
-        const pricePerOunce = pricePerGram === null
-            ? null
-            : pricePerGram * 31.1034768;
-
-        setText(
-            "#gold-price",
-            formatCurrency(
-                pricePerGram,
-                state.selectedCurrency
-            )
-        );
-
-        setText(
-            "#gold-gram-price",
-            formatCurrency(
-                pricePerGram,
-                state.selectedCurrency
-            )
-        );
-
-        setText(
-            "#gold-ounce-price",
-            formatCurrency(
-                pricePerOunce,
-                state.selectedCurrency
-            )
-        );
-
-        setText(
-            "#gold-date",
-            formatDate(gold.date)
-        );
-
-        setText(
-            "[data-gold-price]",
-            formatCurrency(
-                pricePerGram,
-                state.selectedCurrency
-            )
-        );
-    }
-
-
-    /* ========================================================
-       12. CURRENCY TABLE
-    ======================================================== */
-
-    function renderCurrencyTable() {
-        const tableBody = $(
-            "#currency-table-body, " +
-            "#currencies-table-body, " +
-            "[data-currency-table-body]"
-        );
-
-        if (!tableBody) {
-            return;
-        }
-
-        const rates = getCurrencyRates();
-
-        if (!rates.length) {
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="5">
-                        Currency data is currently unavailable.
-                    </td>
-                </tr>
-            `;
-
-            return;
-        }
-
-        const selectedRate = getPLNRate(
-            state.selectedCurrency
-        );
-
-        const rows = rates.map(rate => {
-            const code = rate.code;
-
-            const valuePLN = safeNumber(rate.value);
-
-            const converted = valuePLN !== null &&
-                selectedRate !== null
-                    ? valuePLN / selectedRate
-                    : null;
-
-            return `
-                <tr>
-                    <td>
-                        <strong>${escapeHTML(code)}</strong>
-                    </td>
-
-                    <td>
-                        ${escapeHTML(
-                            CONFIG.currencyNames[code] || code
-                        )}
-                    </td>
-
-                    <td>
-                        ${formatNumber(valuePLN, 4)} PLN
-                    </td>
-
-                    <td>
-                        ${converted === null
-                            ? "—"
-                            : formatNumber(converted, 4) +
-                              " " +
-                              escapeHTML(state.selectedCurrency)}
-                    </td>
-
-                    <td>
-                        ${escapeHTML(rate.date || "—")}
-                    </td>
-                </tr>
-            `;
         });
 
-        tableBody.innerHTML = rows.join("");
+        return state.charts[canvasId];
     }
 
 
-    /* ========================================================
-       13. ECONOMIC INDICATORS
-    ======================================================== */
+    async function renderDashboardChart() {
+        const type = state.activeChart;
 
-    function getLatestObservation(
-        country,
-        category,
-        indicator
-    ) {
-        const observations = safeArray(
-            state.dashboard?.observations
+        try {
+            if (type === "currencies") {
+                await renderCurrencyTrendChart();
+            }
+
+            if (type === "gold") {
+                await renderGoldDashboardChart();
+            }
+
+            if (type === "bitcoin") {
+                await renderBitcoinDashboardChart();
+            }
+
+            if (type === "inflation" || type === "gdp") {
+                await renderEconomyDashboardChart(type);
+            }
+
+        } catch (error) {
+            console.error("Dashboard chart error:", error);
+
+            showNotification(
+                "The selected historical chart is unavailable.",
+                "error"
+            );
+        }
+    }
+
+
+    async function renderCurrencyTrendChart() {
+        const currency =
+            $("#trendCurrency")?.value || "USD";
+
+        const days = state.chartPeriod === "7d"
+            ? 7
+            : state.chartPeriod === "90d"
+                ? 90
+                : state.chartPeriod === "1y"
+                    ? 365
+                    : 30;
+
+        const history = await fetchNBPCurrencyHistory(currency, days);
+
+        createChart("dashboardMainChart", {
+            labels: history.map(item => item.date),
+            values: history.map(item => item.value),
+            color: "#e6ad5e",
+            label: `${currency}/PLN`
+        });
+    }
+
+
+    async function fetchNBPCurrencyHistory(currency, days) {
+        const count = Math.max(1, Math.min(365, Number(days)));
+
+        const url =
+            `https://api.nbp.pl/api/exchangerates/rates/A/${currency}/last/${count}/?format=json`;
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`NBP history error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        return data.rates.map(item => ({
+            date: item.effectiveDate,
+            value: item.mid
+        }));
+    }
+
+
+    async function renderGoldDashboardChart() {
+        const days = periodToDays(state.chartPeriod);
+
+        const history = await DATA.fetchGoldHistory(days);
+
+        const values = await Promise.all(
+            history.map(item =>
+                DATA.convertPLNValue(item.value, state.currency)
+            )
         );
 
-        return observations
-            .filter(item => {
-                const countryMatches =
-                    item.country === country;
+        createChart("dashboardMainChart", {
+            labels: history.map(item => item.date),
+            values: values,
+            color: "#e6ad5e",
+            label: `Gold / ${state.currency}`
+        });
+    }
 
-                const categoryMatches =
-                    !category ||
-                    item.category === category;
 
-                const indicatorMatches =
-                    !indicator ||
-                    item.indicator === indicator;
+    async function renderBitcoinDashboardChart() {
+        const days = periodToDays(state.chartPeriod);
 
+        const history = await DATA.fetchBitcoinHistory(
+            state.currency.toLowerCase(),
+            days
+        );
+
+        createChart("dashboardMainChart", {
+            labels: history.map(item => formatDate(item.date)),
+            values: history.map(item => item.value),
+            color: "#e6ad5e",
+            label: `BTC / ${state.currency}`
+        });
+    }
+
+
+    async function renderEconomyDashboardChart(type) {
+        const history = await DATA.fetchWorldBankIndicator(
+            state.country,
+            type,
+            2000
+        );
+
+        createChart("dashboardMainChart", {
+            labels: history.map(item => item.year),
+            values: history.map(item => item.value),
+            color: type === "inflation" ? "#8fc9db" : "#e6ad5e",
+            label: type
+        });
+    }
+
+
+    function periodToDays(period) {
+        const periods = {
+            "24h": 1,
+            "7d": 7,
+            "30d": 30,
+            "90d": 90,
+            "1y": 365,
+            "5y": 365
+        };
+
+        return periods[period] || 30;
+    }
+
+
+    /* =====================================================
+       CHART CONTROLS
+    ===================================================== */
+
+    function installChartControls() {
+        $all(".chart-tab").forEach(function (button) {
+            button.addEventListener("click", function () {
+                $all(".chart-tab").forEach(item =>
+                    item.classList.remove("active")
+                );
+
+                button.classList.add("active");
+
+                state.activeChart = button.dataset.chart;
+
+                renderDashboardChart();
+            });
+        });
+
+        $all("[data-chart-periods] button").forEach(function (button) {
+            button.addEventListener("click", function () {
+                $all("[data-chart-periods] button").forEach(item =>
+                    item.classList.remove("active")
+                );
+
+                button.classList.add("active");
+
+                state.chartPeriod = button.dataset.period;
+
+                renderDashboardChart();
+            });
+        });
+
+        const trendCurrency = $("#trendCurrency");
+
+        if (trendCurrency) {
+            trendCurrency.addEventListener("change", renderDashboardChart);
+        }
+
+        $("#currencyHistoryCode")?.addEventListener(
+            "change",
+            renderCurrencyHistoryPage
+        );
+
+        $("#currencyHistoryPeriod")?.addEventListener(
+            "change",
+            renderCurrencyHistoryPage
+        );
+
+        $("#goldHistoryCurrency")?.addEventListener(
+            "change",
+            loadGoldPage
+        );
+
+        $("#bitcoinCurrency")?.addEventListener(
+            "change",
+            loadBitcoinPage
+        );
+
+        $("#inflationCountry")?.addEventListener(
+            "change",
+            loadInflationPage
+        );
+
+        $("#economyCountry")?.addEventListener(
+            "change",
+            loadEconomyPage
+        );
+
+        $("#economyIndicator")?.addEventListener(
+            "change",
+            loadEconomyPage
+        );
+    }
+
+
+    async function renderCurrencyHistoryPage() {
+        const code = $("#currencyHistoryCode")?.value || "USD";
+
+        const period = $("#currencyHistoryPeriod")?.value || "30d";
+
+        try {
+            const days = periodToDays(period);
+
+            const history = await fetchNBPCurrencyHistory(code, days);
+
+            createChart("currencyHistoryChart", {
+                labels: history.map(item => item.date),
+                values: history.map(item => item.value),
+                color: "#e5aa54",
+                label: `${code}/PLN`
+            });
+
+        } catch (error) {
+            showNotification("Currency history unavailable.", "error");
+        }
+    }
+
+
+    /* =====================================================
+       CALCULATORS
+    ===================================================== */
+
+    function readPositive(id, label, allowZero = true) {
+        const value = safeNumber(document.getElementById(id)?.value);
+
+        if (
+            value === null ||
+            (allowZero ? value < 0 : value <= 0)
+        ) {
+            throw new Error(`Enter a valid ${label}.`);
+        }
+
+        return value;
+    }
+
+
+    function calculateCompound() {
+        try {
+            const principal = readPositive("compoundPrincipal", "amount");
+            const rate = readPositive("compoundRate", "interest rate");
+            const years = readPositive("compoundYears", "number of years");
+            const frequency = readPositive("compoundFrequency", "frequency", false);
+
+            const finalValue = principal *
+                Math.pow(
+                    1 + (rate / 100) / frequency,
+                    frequency * years
+                );
+
+            const interest = finalValue - principal;
+
+            setText(
+                "compoundResult",
+                `Final value: ${formatMoney(finalValue, state.currency)} · Interest: ${formatMoney(interest, state.currency)}`
+            );
+
+        } catch (error) {
+            setText("compoundResult", error.message);
+        }
+    }
+
+
+    function calculateSimple() {
+        try {
+            const principal = readPositive("simplePrincipal", "amount");
+            const rate = readPositive("simpleRate", "interest rate");
+            const years = readPositive("simpleYears", "number of years");
+
+            const interest = principal * (rate / 100) * years;
+            const total = principal + interest;
+
+            setText(
+                "simpleResult",
+                `Total: ${formatMoney(total, state.currency)} · Interest: ${formatMoney(interest, state.currency)}`
+            );
+
+        } catch (error) {
+            setText("simpleResult", error.message);
+        }
+    }
+
+
+    function calculateInflation() {
+        try {
+            const amount = readPositive("inflationAmount", "amount");
+            const rate = safeNumber($("#inflationRateInput")?.value);
+            const years = readPositive("inflationYears", "number of years");
+
+            if (rate === null || rate <= -100) {
+                throw new Error("Inflation rate must be greater than -100%.");
+            }
+
+            const futureCost = amount *
+                Math.pow(1 + rate / 100, years);
+
+            const purchasingPower = amount /
+                Math.pow(1 + rate / 100, years);
+
+            setText(
+                "inflationResult",
+                `Equivalent future cost: ${formatMoney(futureCost, state.currency)} · Present purchasing power: ${formatMoney(purchasingPower, state.currency)}`
+            );
+
+        } catch (error) {
+            setText("inflationResult", error.message);
+        }
+    }
+
+
+    function calculateFuture() {
+        try {
+            const present = readPositive("futurePresentValue", "amount");
+            const rate = safeNumber($("#futureRate")?.value);
+            const years = readPositive("futureYears", "number of years");
+
+            if (rate === null || rate <= -100) {
+                throw new Error("Growth rate must be greater than -100%.");
+            }
+
+            const future = present *
+                Math.pow(1 + rate / 100, years);
+
+            setText(
+                "futureResult",
+                formatMoney(future, state.currency)
+            );
+
+        } catch (error) {
+            setText("futureResult", error.message);
+        }
+    }
+
+
+    function installCalculatorControls() {
+        $("#calculateCompound")?.addEventListener(
+            "click",
+            calculateCompound
+        );
+
+        $("#calculateSimple")?.addEventListener(
+            "click",
+            calculateSimple
+        );
+
+        $("#calculateInflation")?.addEventListener(
+            "click",
+            calculateInflation
+        );
+
+        $("#calculateFuture")?.addEventListener(
+            "click",
+            calculateFuture
+        );
+
+        $("#calculateCurrency")?.addEventListener(
+            "click",
+            convertQuickCalculator
+        );
+
+        $all("[data-calculator]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                openPage("calculators");
+
+                const type = button.dataset.calculator;
+
+                const mapping = {
+                    compound: "compoundPrincipal",
+                    simple: "simplePrincipal",
+                    inflation: "inflationAmount",
+                    future: "futurePresentValue"
+                };
+
+                const target = document.getElementById(mapping[type]);
+
+                if (target) {
+                    target.focus();
+                    target.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center"
+                    });
+                }
+            });
+        });
+    }
+
+
+    /* =====================================================
+       HISTORICAL ARCHIVE
+    ===================================================== */
+
+    async function renderHistory() {
+        const category = $("#historyCategory")?.value || "currencies";
+
+        const body = $("#historicalTableBody");
+
+        if (!body) return;
+
+        body.innerHTML =
+            '<tr><td colspan="5">Loading archive data...</td></tr>';
+
+        try {
+            let rows = [];
+
+            if (category === "gold") {
+                const history = await DATA.fetchGoldHistory(365);
+
+                rows = history.map(item => ({
+                    date: item.date,
+                    category: "Gold",
+                    value: item.value,
+                    unit: "PLN / gram",
+                    source: "NBP"
+                }));
+            }
+
+            if (category === "bitcoin") {
+                const history = await DATA.fetchBitcoinHistory("usd", 365);
+
+                rows = history.map(item => ({
+                    date: formatDate(item.date),
+                    category: "Bitcoin",
+                    value: item.value,
+                    unit: "USD",
+                    source: "CoinGecko"
+                }));
+            }
+
+            if (category === "currencies") {
+                const history = await fetchNBPCurrencyHistory("USD", 365);
+
+                rows = history.map(item => ({
+                    date: item.date,
+                    category: "USD/PLN",
+                    value: item.value,
+                    unit: "PLN",
+                    source: "NBP"
+                }));
+            }
+
+            if (category === "inflation" || category === "gdp" || category === "unemployment") {
+                const indicator = category === "gdp"
+                    ? "gdp"
+                    : category;
+
+                const history = await DATA.fetchWorldBankIndicator(
+                    state.country,
+                    indicator,
+                    2000
+                );
+
+                rows = history.map(item => ({
+                    date: item.year,
+                    category: indicator,
+                    value: item.value,
+                    unit: "%",
+                    source: "World Bank"
+                }));
+            }
+
+            const search =
+                ($("#historySearch")?.value || "").toLowerCase();
+
+            const start = $("#historyStartDate")?.value;
+            const end = $("#historyEndDate")?.value;
+
+            rows = rows.filter(function (item) {
+                const searchable =
+                    `${item.category} ${item.unit} ${item.source}`.toLowerCase();
+
+                if (search && !searchable.includes(search)) {
+                    return false;
+                }
+
+                if (
+                    start &&
+                    String(item.date) < start
+                ) {
+                    return false;
+                }
+
+                if (
+                    end &&
+                    String(item.date) > end
+                ) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            body.replaceChildren();
+
+            rows.forEach(function (item) {
+                const row = document.createElement("tr");
+
+                [
+                    item.date,
+                    item.category,
+                    item.value,
+                    item.unit,
+                    item.source
+                ].forEach(function (value) {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    row.appendChild(cell);
+                });
+
+                body.appendChild(row);
+            });
+
+            createChart("historicalChart", {
+                labels: rows.map(item => item.date),
+                values: rows.map(item => item.value),
+                color: "#d9a85d"
+            });
+
+            if (!rows.length) {
+                body.innerHTML =
+                    '<tr><td colspan="5">No records match the selected filters.</td></tr>';
+            }
+
+        } catch (error) {
+            console.error(error);
+
+            body.innerHTML =
+                '<tr><td colspan="5">Historical data unavailable.</td></tr>';
+        }
+    }
+
+
+    /* =====================================================
+       COUNTRY GLOBE EVENTS
+    ===================================================== */
+
+    async function handleCountrySelected(event) {
+        const country = event.detail;
+
+        if (!country) return;
+
+        setText("countryName", country.name);
+        setText("countryCode", country.code || "Code unavailable");
+
+        $("#countryDetails")?.removeAttribute("hidden");
+
+        const placeholder = $(".country-placeholder");
+
+        if (placeholder) {
+            placeholder.hidden = true;
+        }
+
+        setText("countryCurrency", country.currency || "Unavailable");
+
+        setText("countryGDP", "Loading...");
+        setText("countryInflation", "Loading...");
+        setText("countryUnemployment", "Loading...");
+        setText("countryGDPPerCapita", "Loading...");
+
+        if (!country.code) {
+            setText("countryGDP", "Unavailable");
+            setText("countryInflation", "Unavailable");
+            setText("countryUnemployment", "Unavailable");
+            setText("countryGDPPerCapita", "Unavailable");
+            setText("countryDataSource", "World Bank unavailable");
+            setText("countryObservationDate", "Unavailable");
+            return;
+        }
+
+        try {
+            const profile = await DATA.getCountryProfile(country.code);
+
+            const economy = profile.economy;
+
+            setText(
+                "countryGDP",
+                economy.gdp ? formatPercent(economy.gdp.value) : "Unavailable"
+            );
+
+            setText(
+                "countryInflation",
+                economy.inflation
+                    ? formatPercent(economy.inflation.value)
+                    : "Unavailable"
+            );
+
+            setText(
+                "countryUnemployment",
+                economy.unemployment
+                    ? formatPercent(economy.unemployment.value)
+                    : "Unavailable"
+            );
+
+            setText(
+                "countryGDPPerCapita",
+                economy.gdpPerCapita
+                    ? formatMoney(economy.gdpPerCapita.value, "USD")
+                    : "Unavailable"
+            );
+
+            setText("countryDataSource", "World Bank");
+
+            const dates = Object.values(economy)
+                .filter(Boolean)
+                .map(item => item.year);
+
+            setText(
+                "countryObservationDate",
+                dates.length ? Math.max(...dates) : "Unavailable"
+            );
+
+        } catch (error) {
+            console.error(error);
+
+            setText("countryDataSource", "World Bank unavailable");
+
+            [
+                "countryGDP",
+                "countryInflation",
+                "countryUnemployment",
+                "countryGDPPerCapita",
+                "countryObservationDate"
+            ].forEach(id => setText(id, "Unavailable"));
+        }
+    }
+
+
+    /* =====================================================
+       GLOBAL SEARCH
+    ===================================================== */
+
+    const SEARCH_ITEMS = [
+        { name: "Dashboard", page: "dashboard", keywords: "home overview" },
+        { name: "Currencies", page: "currencies", keywords: "exchange rates money forex" },
+        { name: "Gold", page: "gold", keywords: "precious metals" },
+        { name: "Bitcoin", page: "bitcoin", keywords: "crypto BTC markets" },
+        { name: "Inflation", page: "inflation", keywords: "prices CPI purchasing power" },
+        { name: "Economy", page: "economy", keywords: "GDP unemployment indicators" },
+        { name: "Global Globe", page: "globe", keywords: "earth world countries map" },
+        { name: "Calculators", page: "calculators", keywords: "interest future value converter" },
+        { name: "Historical Archive", page: "history", keywords: "history records past data" },
+        { name: "Reports", page: "reports", keywords: "export csv" },
+        { name: "Settings", page: "settings", keywords: "preferences configuration" }
+    ];
+
+
+    function installSearch() {
+        const input = $("#globalSearch");
+        const results = $("#searchResults");
+
+        if (!input || !results) return;
+
+        input.addEventListener("input", function () {
+            const query = input.value.trim().toLowerCase();
+
+            results.replaceChildren();
+
+            if (!query) {
+                results.hidden = true;
+                return;
+            }
+
+            const matches = SEARCH_ITEMS.filter(function (item) {
                 return (
-                    countryMatches &&
-                    categoryMatches &&
-                    indicatorMatches
+                    item.name.toLowerCase().includes(query) ||
+                    item.keywords.includes(query)
                 );
-            })
-            .sort((a, b) => {
-                return String(b.date).localeCompare(
-                    String(a.date)
-                );
-            })[0] || null;
-    }
-
-
-    function renderEconomicIndicators() {
-        const inflation = getLatestObservation(
-            "PL",
-            "inflation"
-        );
-
-        const gdp = getLatestObservation(
-            "PL",
-            "economy"
-        );
-
-        const europeanInflation = getLatestObservation(
-            "EU",
-            "inflation"
-        );
-
-        setText(
-            "#inflation-value",
-            inflation
-                ? formatPercent(inflation.value)
-                : "—"
-        );
-
-        setText(
-            "#gdp-value",
-            gdp
-                ? formatPercent(gdp.value)
-                : "—"
-        );
-
-        setText(
-            "#eu-inflation-value",
-            europeanInflation
-                ? formatPercent(europeanInflation.value)
-                : "—"
-        );
-
-        setText(
-            "#inflation-date",
-            formatDate(inflation?.date)
-        );
-
-        setText(
-            "#gdp-date",
-            formatDate(gdp?.date)
-        );
-    }
-
-
-    function renderObservationTable() {
-        const body = $(
-            "#economic-table-body, " +
-            "[data-economic-table-body]"
-        );
-
-        if (!body) {
-            return;
-        }
-
-        const observations = safeArray(
-            state.dashboard?.observations
-        );
-
-        if (!observations.length) {
-            body.innerHTML = `
-                <tr>
-                    <td colspan="6">
-                        No economic observations available.
-                    </td>
-                </tr>
-            `;
-
-            return;
-        }
-
-        body.innerHTML = observations.map(item => `
-            <tr>
-                <td>${escapeHTML(item.countryName || item.country)}</td>
-
-                <td>${escapeHTML(item.name || item.indicator)}</td>
-
-                <td>${escapeHTML(item.category || "—")}</td>
-
-                <td>${formatNumber(item.value, 3)}</td>
-
-                <td>${escapeHTML(item.unit || "—")}</td>
-
-                <td>${escapeHTML(item.date || "—")}</td>
-            </tr>
-        `).join("");
-    }
-
-
-    /* ========================================================
-       14. DASHBOARD RENDERER
-    ======================================================== */
-
-    function renderDashboard() {
-        if (!state.dashboard) {
-            return;
-        }
-
-        renderCurrencyTable();
-
-        renderGold();
-
-        renderEconomicIndicators();
-
-        renderObservationTable();
-
-        renderBitcoin();
-
-        renderSourceStatus();
-
-        updateLastUpdated(
-            state.lastDashboardUpdate
-        );
-
-        dispatchEvent("archive:dashboard-rendered", {
-            dashboard: state.dashboard,
-            currency: state.selectedCurrency
-        });
-    }
-
-
-    /* ========================================================
-       15. DATA SOURCE STATUS
-    ======================================================== */
-
-    function renderSourceStatus() {
-        const container = $(
-            "#source-status-list, " +
-            "[data-source-status-list]"
-        );
-
-        if (!container) {
-            return;
-        }
-
-        const sources = safeArray(
-            state.dashboard?.sources
-        );
-
-        if (!sources.length) {
-            container.textContent =
-                "Source status is unavailable.";
-
-            return;
-        }
-
-        container.innerHTML = sources.map(source => {
-            const status = source.status || "unknown";
-
-            const statusLabel =
-                status === "online"
-                    ? "Online"
-                    : status === "error"
-                        ? "Unavailable"
-                        : "Unknown";
-
-            return `
-                <div class="source-status-item">
-                    <span class="source-name">
-                        ${escapeHTML(source.name)}
-                    </span>
-
-                    <span class="source-indicator ${escapeHTML(status)}">
-                        ${statusLabel}
-                    </span>
-
-                    <span class="source-time">
-                        ${formatDateTime(source.checkedAt)}
-                    </span>
-
-                    ${source.error
-                        ? `<small>${escapeHTML(source.error)}</small>`
-                        : ""}
-                </div>
-            `;
-        }).join("");
-    }
-
-
-    /* ========================================================
-       16. CHART MANAGEMENT
-    ======================================================== */
-
-    function createChart(name, canvas, config) {
-        if (!window.Chart || !canvas) {
-            return null;
-        }
-
-        if (state.charts[name]) {
-            state.charts[name].destroy();
-
-            state.charts[name] = null;
-        }
-
-        state.charts[name] = new Chart(
-            canvas,
-            config
-        );
-
-        return state.charts[name];
-    }
-
-
-    async function loadCurrencyChart(currency = "USD") {
-        if (!window.ArchiveData) {
-            return;
-        }
-
-        const canvas = $(
-            "#currency-chart, " +
-            "[data-chart='currency']"
-        );
-
-        if (!canvas) {
-            return;
-        }
-
-        try {
-            const history = await window.ArchiveData
-                .loadCurrencyHistory(currency, 30);
-
-            const observations = safeArray(
-                history?.observations
-            );
-
-            if (!observations.length) {
-                return;
-            }
-
-            const labels = observations.map(item => {
-                return formatDate(item.effectiveDate);
             });
 
-            const values = observations.map(item => {
-                return safeNumber(item.mid);
-            });
+            matches.forEach(function (item) {
+                const button = document.createElement("button");
 
-            createChart(
-                "currency",
-                canvas,
-                {
-                    type: "line",
+                button.className = "search-result-item";
+                button.type = "button";
+                button.textContent = item.name;
 
-                    data: {
-                        labels,
-
-                        datasets: [{
-                            label: `${currency} / PLN`,
-
-                            data: values,
-
-                            borderColor: CONFIG.chartColors.blue,
-
-                            backgroundColor:
-                                "rgba(120, 149, 184, 0.10)",
-
-                            borderWidth: 2,
-
-                            fill: true,
-
-                            tension: 0.3,
-
-                            pointRadius: 1
-                        }]
-                    },
-
-                    options: CONFIG.chartDefaults
-                }
-            );
-
-        } catch (error) {
-            console.error(
-                "[Archive] Currency chart failed:",
-                error
-            );
-        }
-    }
-
-
-    async function loadGoldChart() {
-        if (!window.ArchiveData) {
-            return;
-        }
-
-        const canvas = $(
-            "#gold-chart, " +
-            "[data-chart='gold']"
-        );
-
-        if (!canvas) {
-            return;
-        }
-
-        try {
-            const history = await window.ArchiveData
-                .loadGoldHistory(30);
-
-            const observations = safeArray(history);
-
-            if (!observations.length) {
-                return;
-            }
-
-            const labels = observations.map(item => {
-                return formatDate(item.data);
-            });
-
-            const values = observations.map(item => {
-                const price = safeNumber(item.cena);
-
-                return price === null
-                    ? null
-                    : convertFromPLN(
-                        price,
-                        state.selectedCurrency
-                    );
-            });
-
-            createChart(
-                "gold",
-                canvas,
-                {
-                    type: "line",
-
-                    data: {
-                        labels,
-
-                        datasets: [{
-                            label: "Gold price per gram",
-
-                            data: values,
-
-                            borderColor: CONFIG.chartColors.gold,
-
-                            backgroundColor:
-                                "rgba(197, 164, 109, 0.10)",
-
-                            borderWidth: 2,
-
-                            fill: true,
-
-                            tension: 0.3,
-
-                            pointRadius: 1
-                        }]
-                    },
-
-                    options: CONFIG.chartDefaults
-                }
-            );
-
-        } catch (error) {
-            console.error(
-                "[Archive] Gold chart failed:",
-                error
-            );
-        }
-    }
-
-
-    /* ========================================================
-       17. CHART PERIOD SELECTORS
-    ======================================================== */
-
-    function initializeChartPeriods() {
-        $all("[data-chart-period]").forEach(button => {
-            if (button.dataset.initialized === "true") {
-                return;
-            }
-
-            button.dataset.initialized = "true";
-
-            button.addEventListener("click", async () => {
-                const period = safeNumber(
-                    button.dataset.chartPeriod,
-                    30
-                );
-
-                state.selectedPeriod = period;
-
-                $all("[data-chart-period]").forEach(item => {
-                    item.classList.toggle(
-                        "active",
-                        item === button
-                    );
+                button.addEventListener("click", function () {
+                    openPage(item.page);
+                    results.hidden = true;
+                    input.value = "";
                 });
 
-                try {
-                    await loadBitcoinHistory(period);
-
-                } catch (error) {
-                    console.error(
-                        "[Archive] Could not update chart period:",
-                        error
-                    );
-
-                    showNotification(
-                        "Historical Bitcoin data is temporarily unavailable.",
-                        "warning"
-                    );
-                }
+                results.appendChild(button);
             });
-        });
-    }
 
+            if (!matches.length) {
+                const empty = document.createElement("div");
 
-    /* ========================================================
-       18. NAVIGATION
-    ======================================================== */
+                empty.className = "empty-state";
+                empty.textContent = "No matching sections.";
 
-    function initializeNavigation() {
-        const links = $all(
-            ".nav-link, " +
-            "[data-section-link]"
-        );
-
-        links.forEach(link => {
-            if (link.dataset.initialized === "true") {
-                return;
+                results.appendChild(empty);
             }
 
-            link.dataset.initialized = "true";
-
-            link.addEventListener("click", event => {
-                const href = link.getAttribute("href");
-
-                const sectionId =
-                    link.dataset.sectionLink ||
-                    (href && href.startsWith("#")
-                        ? href.slice(1)
-                        : null);
-
-                if (!sectionId) {
-                    return;
-                }
-
-                const section = document.getElementById(
-                    sectionId
-                );
-
-                if (!section) {
-                    return;
-                }
-
-                event.preventDefault();
-
-                navigateToSection(sectionId);
-            });
-        });
-    }
-
-
-    function navigateToSection(sectionId) {
-        const section = document.getElementById(
-            sectionId
-        );
-
-        if (!section) {
-            return;
-        }
-
-        state.activeSection = sectionId;
-
-        section.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
+            results.hidden = false;
         });
 
-        $all(".nav-link, [data-section-link]").forEach(link => {
-            const target =
-                link.dataset.sectionLink ||
-                link.getAttribute("href")?.replace("#", "");
-
-            link.classList.toggle(
-                "active",
-                target === sectionId
-            );
-        });
-
-        dispatchEvent("archive:section-changed", {
-            section: sectionId
-        });
-    }
-
-
-    /* ========================================================
-       19. MOBILE NAVIGATION
-    ======================================================== */
-
-    function initializeMobileNavigation() {
-        const toggle = $(
-            "#mobile-menu-toggle, " +
-            "[data-mobile-menu-toggle]"
-        );
-
-        const sidebar = $(
-            "#sidebar, " +
-            ".sidebar"
-        );
-
-        if (!toggle || !sidebar) {
-            return;
-        }
-
-        toggle.addEventListener("click", () => {
-            sidebar.classList.toggle("mobile-open");
-
-            toggle.classList.toggle("active");
-        });
-
-        $all(".nav-link", sidebar).forEach(link => {
-            link.addEventListener("click", () => {
-                sidebar.classList.remove("mobile-open");
-
-                toggle.classList.remove("active");
-            });
-        });
-    }
-
-
-    /* ========================================================
-       20. TABLE SEARCH AND FILTERS
-    ======================================================== */
-
-    function initializeTableSearch() {
-        $all("[data-table-search]").forEach(input => {
-            if (input.dataset.initialized === "true") {
-                return;
+        document.addEventListener("click", function (event) {
+            if (
+                !input.contains(event.target) &&
+                !results.contains(event.target)
+            ) {
+                results.hidden = true;
             }
+        });
 
-            input.dataset.initialized = "true";
-
-            const targetSelector =
-                input.dataset.tableSearch;
-
-            const target = $(targetSelector);
-
-            if (!target) {
-                return;
+        input.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                results.hidden = true;
+                input.blur();
             }
-
-            input.addEventListener("input", () => {
-                const query = input.value
-                    .trim()
-                    .toLowerCase();
-
-                $all("tr", target).forEach(row => {
-                    const matches = row.textContent
-                        .toLowerCase()
-                        .includes(query);
-
-                    row.style.display = matches
-                        ? ""
-                        : "none";
-                });
-            });
         });
     }
 
 
-    /* ========================================================
-       21. FINANCIAL CALCULATORS
-    ======================================================== */
-
-    function calculateCompoundInterest({
-        principal,
-        annualRate,
-        years,
-        contributions = 0
-    }) {
-        const P = safeNumber(principal, 0);
-
-        const rate = safeNumber(annualRate, 0) / 100;
-
-        const duration = safeNumber(years, 0);
-
-        const monthlyContribution =
-            safeNumber(contributions, 0);
-
-        if (
-            P < 0 ||
-            duration < 0 ||
-            monthlyContribution < 0
-        ) {
-            return null;
-        }
-
-        const months = Math.round(duration * 12);
-
-        const monthlyRate = rate / 12;
-
-        let balance = P;
-
-        for (let month = 0; month < months; month++) {
-            balance *= 1 + monthlyRate;
-
-            balance += monthlyContribution;
-        }
-
-        const totalContributions =
-            P + monthlyContribution * months;
-
-        return {
-            finalValue: balance,
-
-            totalContributions,
-
-            interest: balance - totalContributions
-        };
-    }
-
-
-    function calculateSimpleInterest({
-        principal,
-        annualRate,
-        years
-    }) {
-        const P = safeNumber(principal, 0);
-
-        const rate = safeNumber(annualRate, 0) / 100;
-
-        const duration = safeNumber(years, 0);
-
-        if (
-            P < 0 ||
-            duration < 0
-        ) {
-            return null;
-        }
-
-        const interest = P * rate * duration;
-
-        return {
-            finalValue: P + interest,
-
-            principal: P,
-
-            interest
-        };
-    }
-
-
-    function calculateInflationValue({
-        amount,
-        inflationRate,
-        years
-    }) {
-        const value = safeNumber(amount, 0);
-
-        const rate = safeNumber(inflationRate, 0) / 100;
-
-        const duration = safeNumber(years, 0);
-
-        if (
-            value < 0 ||
-            duration < 0 ||
-            rate <= -1
-        ) {
-            return null;
-        }
-
-        const futureCost =
-            value * Math.pow(1 + rate, duration);
-
-        return {
-            originalValue: value,
-
-            futureCost,
-
-            difference: futureCost - value
-        };
-    }
-
-
-    function initializeCalculators() {
-        const compoundForm = $(
-            "#compound-interest-form"
-        );
-
-        if (compoundForm) {
-            compoundForm.addEventListener(
-                "submit",
-                event => {
-                    event.preventDefault();
-
-                    const result = calculateCompoundInterest({
-                        principal: $(
-                            "#compound-principal"
-                        )?.value,
-
-                        annualRate: $(
-                            "#compound-rate"
-                        )?.value,
-
-                        years: $(
-                            "#compound-years"
-                        )?.value,
-
-                        contributions: $(
-                            "#compound-contribution"
-                        )?.value || 0
-                    });
-
-                    if (!result) {
-                        showNotification(
-                            "Please enter valid calculator values.",
-                            "warning"
-                        );
-
-                        return;
-                    }
-
-                    setText(
-                        "#compound-result",
-                        formatCurrency(
-                            result.finalValue
-                        )
-                    );
-
-                    setText(
-                        "#compound-invested",
-                        formatCurrency(
-                            result.totalContributions
-                        )
-                    );
-
-                    setText(
-                        "#compound-interest",
-                        formatCurrency(
-                            result.interest
-                        )
-                    );
-                }
-            );
-        }
-
-
-        const simpleForm = $(
-            "#simple-interest-form"
-        );
-
-        if (simpleForm) {
-            simpleForm.addEventListener(
-                "submit",
-                event => {
-                    event.preventDefault();
-
-                    const result = calculateSimpleInterest({
-                        principal: $(
-                            "#simple-principal"
-                        )?.value,
-
-                        annualRate: $(
-                            "#simple-rate"
-                        )?.value,
-
-                        years: $(
-                            "#simple-years"
-                        )?.value
-                    });
-
-                    if (!result) {
-                        showNotification(
-                            "Please enter valid calculator values.",
-                            "warning"
-                        );
-
-                        return;
-                    }
-
-                    setText(
-                        "#simple-result",
-                        formatCurrency(result.finalValue)
-                    );
-
-                    setText(
-                        "#simple-interest-value",
-                        formatCurrency(result.interest)
-                    );
-                }
-            );
-        }
-
-
-        const inflationForm = $(
-            "#inflation-calculator-form"
-        );
-
-        if (inflationForm) {
-            inflationForm.addEventListener(
-                "submit",
-                event => {
-                    event.preventDefault();
-
-                    const result = calculateInflationValue({
-                        amount: $(
-                            "#inflation-amount"
-                        )?.value,
-
-                        inflationRate: $(
-                            "#inflation-rate"
-                        )?.value,
-
-                        years: $(
-                            "#inflation-years"
-                        )?.value
-                    });
-
-                    if (!result) {
-                        showNotification(
-                            "Please enter valid calculator values.",
-                            "warning"
-                        );
-
-                        return;
-                    }
-
-                    setText(
-                        "#inflation-result",
-                        formatCurrency(result.futureCost)
-                    );
-
-                    setText(
-                        "#inflation-difference",
-                        formatCurrency(result.difference)
-                    );
-                }
-            );
-        }
-
-
-        const currencyForm = $(
-            "#currency-calculator-form"
-        );
-
-        if (currencyForm) {
-            currencyForm.addEventListener(
-                "submit",
-                event => {
-                    event.preventDefault();
-
-                    const amount = safeNumber(
-                        $("#conversion-amount")?.value
-                    );
-
-                    const from = $(
-                        "#conversion-from"
-                    )?.value;
-
-                    const to = $(
-                        "#conversion-to"
-                    )?.value;
-
-                    const result = convertCurrency(
-                        amount,
-                        from,
-                        to
-                    );
-
-                    setText(
-                        "#conversion-result",
-                        result === null
-                            ? "Rate unavailable"
-                            : formatCurrency(result, to)
-                    );
-                }
-            );
-        }
-    }
-
-
-    function updateCalculatorCurrency() {
-        $all("[data-calculator-currency]").forEach(element => {
-            element.textContent = state.selectedCurrency;
-        });
-    }
-
-
-    /* ========================================================
-       22. CSV EXPORT
-    ======================================================== */
+    /* =====================================================
+       DATA EXPORT
+    ===================================================== */
 
     function downloadCSV(filename, rows) {
-        if (!Array.isArray(rows) || !rows.length) {
-            showNotification(
-                "There is no data available to export.",
-                "warning"
-            );
-
+        if (!rows || !rows.length) {
+            showNotification("There is no data to export.", "error");
             return;
         }
 
-        const csv = rows.map(row => {
-            return row.map(value => {
-                const safeValue = String(value ?? "")
+        const csv = rows.map(function (row) {
+            return row.map(function (value) {
+                const text = String(value ?? "")
                     .replace(/"/g, '""');
 
-                return `"${safeValue}"`;
+                return `"${text}"`;
             }).join(",");
         }).join("\r\n");
 
         const blob = new Blob(
             ["\uFEFF" + csv],
-            {
-                type: "text/csv;charset=utf-8;"
-            }
+            { type: "text/csv;charset=utf-8;" }
         );
 
         const url = URL.createObjectURL(blob);
@@ -2122,566 +2221,453 @@
         const link = document.createElement("a");
 
         link.href = url;
-
         link.download = filename;
 
         document.body.appendChild(link);
-
         link.click();
-
         link.remove();
 
         URL.revokeObjectURL(url);
     }
 
 
-    function exportCurrencies() {
-        const rows = [
-            [
-                "Currency",
-                "Currency name",
-                "Value in PLN",
-                `Value in ${state.selectedCurrency}`,
-                "Date"
-            ]
-        ];
-
-        getCurrencyRates().forEach(rate => {
-            const converted = convertCurrency(
-                rate.value,
-                "PLN",
-                state.selectedCurrency
-            );
-
-            rows.push([
-                rate.code,
-                CONFIG.currencyNames[rate.code] || rate.code,
-                rate.value,
-                converted ?? "",
-                rate.date || ""
-            ]);
-        });
-
-        downloadCSV(
-            "monetary-archive-currencies.csv",
-            rows
-        );
-    }
-
-
-    function exportEconomicData() {
-        const rows = [
-            [
-                "Country",
-                "Indicator",
-                "Category",
-                "Value",
-                "Unit",
-                "Date",
-                "Source"
-            ]
-        ];
-
-        safeArray(
-            state.dashboard?.observations
-        ).forEach(item => {
-            rows.push([
-                item.countryName || item.country,
-                item.name || item.indicator,
-                item.category,
-                item.value,
-                item.unit,
-                item.date,
-                item.source
-            ]);
-        });
-
-        downloadCSV(
-            "monetary-archive-economic-data.csv",
-            rows
-        );
-    }
-
-
-    function initializeExports() {
-        $all("[data-export-currencies]").forEach(button => {
-            button.addEventListener(
-                "click",
-                exportCurrencies
-            );
-        });
-
-        $all("[data-export-economy]").forEach(button => {
-            button.addEventListener(
-                "click",
-                exportEconomicData
-            );
-        });
-    }
-
-
-    /* ========================================================
-       23. MANUAL REFRESH
-    ======================================================== */
-
-    async function refreshAllData() {
-        if (state.isRefreshing) {
-            return;
-        }
-
-        state.isRefreshing = true;
-
-        updateConnectionStatus(
-            "loading",
-            "Updating data..."
-        );
-
+    async function exportData(type) {
         try {
-            if (window.ArchiveData?.clearCache) {
-                window.ArchiveData.clearCache();
+            if (type === "currencies") {
+                const rates = await DATA.getExchangeRates();
+
+                downloadCSV("monetary-archive-currencies.csv", [
+                    ["Currency", "Rate in PLN", "Previous rate", "Change", "Source"],
+                    ...rates.rows.map(item => [
+                        item.code,
+                        item.rate,
+                        item.previousRate,
+                        item.change,
+                        item.source
+                    ])
+                ]);
+
+                return;
             }
 
-            await Promise.allSettled([
-                loadMainData(true),
-                loadBitcoin(),
-                loadBitcoinHistory(state.selectedPeriod)
-            ]);
+            if (type === "economy") {
+                const economy = await DATA.fetchCountryEconomy(state.country);
 
-            renderDashboard();
+                const rows = [
+                    ["Indicator", "Year", "Value", "Source"]
+                ];
 
-            updateConnectionStatus(
-                "online",
-                "Data updated"
-            );
+                Object.entries(economy).forEach(function ([name, values]) {
+                    values.forEach(function (item) {
+                        rows.push([
+                            name,
+                            item.year,
+                            item.value,
+                            item.source
+                        ]);
+                    });
+                });
 
-            showNotification(
-                "The financial dashboard has been refreshed.",
-                "success"
-            );
+                downloadCSV("monetary-archive-economy.csv", rows);
+
+                return;
+            }
+
+            if (type === "markets") {
+                const bitcoin = await DATA.fetchBitcoinCurrent(
+                    state.currency.toLowerCase()
+                );
+
+                downloadCSV("monetary-archive-markets.csv", [
+                    ["Asset", "Price", "Currency", "Market cap", "24h volume", "24h change", "Source"],
+                    [
+                        "Bitcoin",
+                        bitcoin.price,
+                        bitcoin.currency,
+                        bitcoin.marketCap,
+                        bitcoin.volume24h,
+                        bitcoin.change24h,
+                        bitcoin.source
+                    ]
+                ]);
+            }
 
         } catch (error) {
-            console.error(
-                "[Archive] Refresh failed:",
-                error
-            );
-
-            updateConnectionStatus(
-                "error",
-                "Some data sources are unavailable"
-            );
-
             showNotification(
-                "Some data could not be refreshed.",
-                "warning"
+                `Export failed: ${error.message}`,
+                "error"
             );
-
-        } finally {
-            state.isRefreshing = false;
         }
     }
 
 
-    function initializeRefreshButton() {
-        const buttons = $all(
-            "#refresh-button, " +
-            "[data-refresh-dashboard]"
-        );
-
-        buttons.forEach(button => {
-            button.addEventListener(
-                "click",
-                refreshAllData
-            );
+    function installExports() {
+        $all("[data-export]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                exportData(button.dataset.export);
+            });
         });
     }
 
 
-    /* ========================================================
-       24. AUTOMATIC UPDATES
-    ======================================================== */
+    /* =====================================================
+       ACTION BUTTONS
+    ===================================================== */
 
-    function startAutomaticUpdates() {
-        window.setInterval(async () => {
-            try {
-                await loadMainData(true);
+    function installActionButtons() {
+        $all("[data-action]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                const action = button.dataset.action;
 
-                renderDashboard();
+                const actions = {
+                    "open-archive": "history",
+                    "open-currencies": "currencies",
+                    "open-economy": "economy",
+                    "open-bitcoin": "bitcoin",
+                    "open-history": "history"
+                };
 
-            } catch (error) {
-                console.warn(
-                    "[Archive] Automatic dashboard update failed:",
-                    error
-                );
-            }
-
-        }, CONFIG.refreshInterval);
-
-
-        window.setInterval(async () => {
-            try {
-                await loadBitcoin();
-
-            } catch (error) {
-                console.warn(
-                    "[Archive] Automatic Bitcoin update failed:",
-                    error
-                );
-            }
-
-        }, CONFIG.bitcoinRefreshInterval);
-    }
-
-
-    /* ========================================================
-       25. COUNTRY SELECTION FROM GLOBE
-    ======================================================== */
-
-    function initializeGlobeEvents() {
-        window.addEventListener(
-            "archive:country-selected",
-            event => {
-                const country = event.detail;
-
-                if (!country) {
+                if (action === "refresh-currencies") {
+                    renderCurrenciesTable();
                     return;
                 }
 
-                state.selectedCountry =
-                    country.id || state.selectedCountry;
-
-                setText(
-                    "#selected-country-name",
-                    country.name || "Unknown country"
-                );
-
-                setText(
-                    "#country-name",
-                    country.name || "Unknown country"
-                );
-
-                renderSelectedCountry(country);
-            }
-        );
-    }
-
-
-    function renderSelectedCountry(country) {
-        const panel = $(
-            "#country-panel, " +
-            "[data-country-panel]"
-        );
-
-        if (panel) {
-            panel.classList.add("active");
-        }
-
-        /*
-         * The current data engine provides World Bank
-         * observations for Poland and the United States.
-         *
-         * Other countries are not assigned invented
-         * economic figures.
-         */
-
-        const countryCode = country.id;
-
-        const inflation = getLatestObservation(
-            countryCode,
-            "inflation"
-        );
-
-        const gdp = getLatestObservation(
-            countryCode,
-            "economy"
-        );
-
-        setText(
-            "#country-inflation",
-            inflation
-                ? formatPercent(inflation.value)
-                : "Not available"
-        );
-
-        setText(
-            "#country-gdp",
-            gdp
-                ? formatPercent(gdp.value)
-                : "Not available"
-        );
-
-        setText(
-            "#country-data-date",
-            formatDate(
-                inflation?.date || gdp?.date
-            )
-        );
-
-        dispatchEvent("archive:country-data-rendered", {
-            country,
-            inflation,
-            gdp
+                if (actions[action]) {
+                    openPage(actions[action]);
+                }
+            });
         });
     }
 
 
-    /* ========================================================
-       26. TOOLTIP INITIALIZATION
-    ======================================================== */
+    /* =====================================================
+       SETTINGS
+    ===================================================== */
 
-    function initializeTooltips() {
-        $all("[data-tooltip]").forEach(element => {
-            element.setAttribute(
-                "title",
-                element.dataset.tooltip
-            );
-        });
-    }
-
-
-    /* ========================================================
-       27. ACCESSIBILITY
-    ======================================================== */
-
-    function initializeAccessibility() {
-        $all("button").forEach(button => {
-            if (!button.getAttribute("aria-label") &&
-                !button.textContent.trim()) {
-
-                button.setAttribute(
-                    "aria-label",
-                    "Website control"
-                );
-            }
-        });
-    }
-
-
-    /* ========================================================
-       28. INITIAL CHART LOADING
-    ======================================================== */
-
-    async function initializeCharts() {
-        const tasks = [];
-
-        if (
-            $("#currency-chart") ||
-            $("[data-chart='currency']")
-        ) {
-            tasks.push(
-                loadCurrencyChart("USD")
-            );
-        }
-
-        if (
-            $("#gold-chart") ||
-            $("[data-chart='gold']")
-        ) {
-            tasks.push(
-                loadGoldChart()
-            );
-        }
-
-        if (
-            $("#bitcoin-chart") ||
-            $("#btc-chart") ||
-            $("[data-chart='bitcoin']")
-        ) {
-            tasks.push(
-                loadBitcoinHistory(
-                    state.selectedPeriod
-                )
-            );
-        }
-
-        await Promise.allSettled(tasks);
-    }
-
-
-    /* ========================================================
-       29. APPLICATION INITIALIZATION
-    ======================================================== */
-
-    async function initializeApplication() {
-        console.info(
-            "[Monetary Archive] Initializing application..."
-        );
-
-        setLoading(true);
-
-        restoreCurrencyPreference();
-
-        initializeCurrencySelector();
-
-        initializeNavigation();
-
-        initializeMobileNavigation();
-
-        initializeTableSearch();
-
-        initializeCalculators();
-
-        initializeExports();
-
-        initializeRefreshButton();
-
-        initializeChartPeriods();
-
-        initializeGlobeEvents();
-
-        initializeTooltips();
-
-        initializeAccessibility();
-
+    function readSettings() {
         try {
-            const results = await Promise.allSettled([
-                loadMainData(false),
-                loadBitcoin()
-            ]);
+            const saved = localStorage.getItem("monetaryArchiveSettings");
 
-            const dashboardResult = results[0];
-
-            const bitcoinResult = results[1];
-
-            if (dashboardResult.status === "fulfilled") {
-                renderDashboard();
-
-                updateConnectionStatus(
-                    "online",
-                    "Data connected"
-                );
-
-            } else {
-                console.error(
-                    "[Archive] Main data failed:",
-                    dashboardResult.reason
-                );
-
-                updateConnectionStatus(
-                    "error",
-                    "Economic data unavailable"
-                );
-
-                showNotification(
-                    "The economic data service could not be reached.",
-                    "warning"
-                );
+            if (saved) {
+                state.settings = {
+                    ...state.settings,
+                    ...JSON.parse(saved)
+                };
             }
 
-            if (bitcoinResult.status === "rejected") {
-                console.error(
-                    "[Archive] Bitcoin data failed:",
-                    bitcoinResult.reason
-                );
+        } catch (error) {
+            console.warn("Settings could not be loaded.", error);
+        }
 
-                setText(
-                    "#bitcoin-price",
-                    "Temporarily unavailable"
-                );
-            }
+        state.currency = state.settings.currency || "USD";
 
-            await initializeCharts();
+        document.body.classList.toggle(
+            "reduce-motion",
+            !state.settings.animations
+        );
+    }
 
-            updateCalculatorCurrency();
 
-            updateLastUpdated(
-                state.lastDashboardUpdate
+    function saveSettings() {
+        try {
+            localStorage.setItem(
+                "monetaryArchiveSettings",
+                JSON.stringify(state.settings)
             );
 
         } catch (error) {
-            console.error(
-                "[Monetary Archive] Initialization error:",
-                error
-            );
+            console.warn("Settings could not be saved.", error);
+        }
+    }
 
-            updateConnectionStatus(
-                "error",
-                "Initialization failed"
-            );
 
-        } finally {
-            setLoading(false);
+    function renderSettings() {
+        const currency = $("#defaultCurrency");
+        const autoRefresh = $("#autoRefreshSetting");
+        const interval = $("#refreshInterval");
+        const animations = $("#animationsSetting");
 
-            document.body.classList.add(
-                "archive-initialized"
-            );
+        if (currency) currency.value = state.currency;
 
-            dispatchEvent("archive:application-ready", {
-                version: "1.0.0"
-            });
-
-            console.info(
-                "[Monetary Archive] Application initialized."
-            );
+        if (autoRefresh) {
+            autoRefresh.checked = state.settings.autoRefresh;
         }
 
-        startAutomaticUpdates();
+        if (interval) {
+            interval.value = String(state.settings.refreshInterval);
+        }
+
+        if (animations) {
+            animations.checked = state.settings.animations;
+        }
     }
 
 
-    /* ========================================================
-       30. PUBLIC APPLICATION API
-    ======================================================== */
+    function applyCurrency(currency) {
+        const code = String(currency || "USD").toUpperCase();
 
-    window.MonetaryArchive = Object.freeze({
+        state.currency = code;
+        state.settings.currency = code;
 
-        version: "1.0.0",
+        saveSettings();
 
-        getState() {
-            return {
-                selectedCurrency: state.selectedCurrency,
+        renderDashboard(state.dashboard || {});
 
-                selectedCountry: state.selectedCountry,
+        if (state.activePage === "bitcoin") {
+            loadBitcoinPage();
+        }
 
-                dashboard: state.dashboard,
+        if (state.activePage === "gold") {
+            loadGoldPage();
+        }
 
-                bitcoin: state.bitcoin,
+        renderDashboardChart();
+    }
 
-                bitcoinHistory: state.bitcoinHistory,
 
-                lastDashboardUpdate:
-                    state.lastDashboardUpdate
+    function installSettings() {
+        $("#defaultCurrency")?.addEventListener("change", function () {
+            applyCurrency(this.value);
+
+            showNotification(
+                `Display currency changed to ${this.value}.`,
+                "success"
+            );
+        });
+
+        $("#autoRefreshSetting")?.addEventListener("change", function () {
+            state.settings.autoRefresh = this.checked;
+
+            saveSettings();
+            setupAutoRefresh();
+        });
+
+        $("#refreshInterval")?.addEventListener("change", function () {
+            state.settings.refreshInterval = Number(this.value);
+
+            saveSettings();
+            setupAutoRefresh();
+        });
+
+        $("#animationsSetting")?.addEventListener("change", function () {
+            state.settings.animations = this.checked;
+
+            document.body.classList.toggle(
+                "reduce-motion",
+                !this.checked
+            );
+
+            saveSettings();
+        });
+
+        $("#clearCache")?.addEventListener("click", function () {
+            DATA.clearCache();
+
+            showNotification(
+                "Cached financial data has been cleared.",
+                "success"
+            );
+
+            loadDashboard();
+        });
+
+        $("#resetSettings")?.addEventListener("click", function () {
+            state.settings = {
+                autoRefresh: true,
+                refreshInterval: 300000,
+                animations: true,
+                currency: "USD"
             };
-        },
 
-        refresh: refreshAllData,
+            state.currency = "USD";
 
-        changeCurrency,
+            saveSettings();
+            renderSettings();
+            setupAutoRefresh();
 
-        navigateToSection,
-
-        convertCurrency,
-
-        formatCurrency,
-
-        formatNumber,
-
-        formatPercent,
-
-        exportCurrencies,
-
-        exportEconomicData,
-
-        calculateCompoundInterest,
-
-        calculateSimpleInterest,
-
-        calculateInflationValue
-    });
+            showNotification("Settings restored.", "success");
+        });
+    }
 
 
-    /* ========================================================
-       31. START APPLICATION
-    ======================================================== */
+    /* =====================================================
+       COUNTRY SELECTION
+    ===================================================== */
 
-    if (document.readyState === "loading") {
-        document.addEventListener(
-            "DOMContentLoaded",
-            initializeApplication,
-            { once: true }
+    function installCountrySelector() {
+        $("#selectedCountry")?.addEventListener("change", function () {
+            state.country = this.value;
+
+            setText(
+                "inflationCountryLabel",
+                COUNTRY_NAMES[state.country] || state.country
+            );
+
+            setText(
+                "gdpCountryLabel",
+                COUNTRY_NAMES[state.country] || state.country
+            );
+
+            loadDashboard();
+
+            if (state.activePage === "economy") {
+                const selector = $("#economyCountry");
+
+                if (selector) selector.value = state.country;
+
+                loadEconomyPage();
+            }
+        });
+    }
+
+
+    /* =====================================================
+       CONVERTER EVENTS
+    ===================================================== */
+
+    function installConverter() {
+        $("#convertCurrency")?.addEventListener(
+            "click",
+            convertFromForm
         );
 
-    } else {
-        initializeApplication();
+        $("#swapCurrencies")?.addEventListener(
+            "click",
+            swapCurrencies
+        );
+
+        $("#converterFromAmount")?.addEventListener(
+            "input",
+            function () {
+                if (this.value && Number(this.value) >= 0) {
+                    convertFromForm();
+                }
+            }
+        );
+
+        $("#converterFrom")?.addEventListener(
+            "change",
+            convertFromForm
+        );
+
+        $("#converterTo")?.addEventListener(
+            "change",
+            convertFromForm
+        );
+
+        $("#currencySearch")?.addEventListener(
+            "input",
+            renderCurrenciesTable
+        );
+
+        $("#currencyDisplay")?.addEventListener(
+            "change",
+            renderCurrenciesTable
+        );
+
+        $("#currencySort")?.addEventListener(
+            "change",
+            renderCurrenciesTable
+        );
+
+        $("#searchHistory")?.addEventListener(
+            "click",
+            renderHistory
+        );
+
+        $("#historyCategory")?.addEventListener(
+            "change",
+            renderHistory
+        );
     }
+
+
+    /* =====================================================
+       AUTOMATIC REFRESH
+    ===================================================== */
+
+    let refreshTimer = null;
+
+    function setupAutoRefresh() {
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+
+        if (!state.settings.autoRefresh) return;
+
+        const interval = Math.max(
+            60000,
+            Number(state.settings.refreshInterval) || 300000
+        );
+
+        refreshTimer = setInterval(function () {
+            loadDashboard();
+        }, interval);
+    }
+
+
+    /* =====================================================
+       INITIALIZATION
+    ===================================================== */
+
+    async function initialize() {
+        if (!DATA) {
+            console.error("ArchiveData module is missing.");
+
+            setApplicationStatus("Data module not found.");
+
+            setConnectionStatus(false, "Module error");
+
+            showNotification(
+                "data.js could not be loaded. Check your script files.",
+                "error"
+            );
+
+            return;
+        }
+
+        readSettings();
+
+        updateClock();
+
+        setInterval(updateClock, 1000);
+
+        installNavigation();
+        installSearch();
+        installChartControls();
+        installCalculatorControls();
+        installExports();
+        installActionButtons();
+        installSettings();
+        installCountrySelector();
+        installConverter();
+
+        installCountrySelector();
+
+        window.addEventListener(
+            "archive:country-selected",
+            handleCountrySelected
+        );
+
+        $("#selectedCountry").value = state.country;
+
+        $("#trendCurrency").value = state.currency;
+
+        $("#currencyDisplay").value = state.currency;
+
+        renderSettings();
+
+        setupAutoRefresh();
+
+        await loadDashboard();
+
+        await convertFromForm().catch(() => {});
+
+        console.info("The Monetary Archive initialized.");
+    }
+
+
+    document.addEventListener("DOMContentLoaded", initialize);
 
 })();
