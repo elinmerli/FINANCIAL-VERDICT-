@@ -1,23 +1,28 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <meta name="theme-color" content="#10100f">
-    <meta name="description" content="The Monetary Archive — international financial and economic archive.">
+    <meta
+        name="description"
+        content="The Monetary Archive — international financial and economic information."
+    >
 
     <title>The Monetary Archive</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
 
     <link rel="stylesheet" href="styles.css">
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/globe.gl" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/globe.gl"></script>
 
     <script src="data.js" defer></script>
     <script src="globe.js" defer></script>
@@ -25,148 +30,175 @@
 </head>
 
 <body>
-    <div class="layout">
 
-        <aside class="sidebar">
+<div class="app-shell">
 
-            <div class="brand">
-                <div class="brand-emblem">M.A.</div>
+    <aside class="sidebar">
 
-                <div class="brand-name">
-                    THE MONETARY<br>
-                    ARCHIVE
-                </div>
+        <div class="brand">
+            <div class="brand-emblem">M</div>
 
-                <div class="brand-subtitle">
-                    INTERNATIONAL FINANCIAL RECORDS
-                </div>
+            <div class="brand-text">
+                <span class="brand-name">THE MONETARY</span>
+                <span class="brand-subtitle">ARCHIVE</span>
             </div>
+        </div>
 
-            <div class="navigation-heading">
-                ARCHIVE SECTIONS
-            </div>
+        <div class="sidebar-divider"></div>
 
-            <nav class="navigation" aria-label="Main navigation">
+        <div class="navigation-caption">MAIN ARCHIVE</div>
 
-                <button class="nav-link active" data-page="overview">
-                    <span class="nav-icon">⌂</span>
-                    <span>Overview</span>
-                </button>
+        <nav class="navigation" aria-label="Main navigation">
 
-                <button class="nav-link" data-page="globe">
-                    <span class="nav-icon">◎</span>
-                    <span>Global Globe</span>
-                </button>
+            <button class="nav-link active" data-page="overview">
+                <span class="nav-icon">⌂</span>
+                <span>Overview</span>
+            </button>
 
-                <button class="nav-link" data-page="currencies">
-                    <span class="nav-icon">¤</span>
-                    <span>Currencies</span>
-                </button>
+            <button class="nav-link" data-page="globe">
+                <span class="nav-icon">◎</span>
+                <span>Global Globe</span>
+            </button>
 
-                <button class="nav-link" data-page="markets">
-                    <span class="nav-icon">◈</span>
-                    <span>Markets & Bitcoin</span>
-                </button>
+            <button class="nav-link" data-page="currencies">
+                <span class="nav-icon">¤</span>
+                <span>Currencies</span>
+            </button>
 
-                <button class="nav-link" data-page="economy">
-                    <span class="nav-icon">▤</span>
-                    <span>Inflation & Economy</span>
-                </button>
+            <button class="nav-link" data-page="markets">
+                <span class="nav-icon">⌁</span>
+                <span>Markets & Bitcoin</span>
+            </button>
 
-                <button class="nav-link" data-page="calculators">
-                    <span class="nav-icon">∑</span>
-                    <span>Calculators</span>
-                </button>
+            <button class="nav-link" data-page="economy">
+                <span class="nav-icon">▤</span>
+                <span>Inflation & Economy</span>
+            </button>
 
-                <button class="nav-link" data-page="history">
-                    <span class="nav-icon">◷</span>
-                    <span>Historical Archive</span>
-                </button>
+            <button class="nav-link" data-page="calculators">
+                <span class="nav-icon">∑</span>
+                <span>Calculators</span>
+            </button>
 
-            </nav>
+            <button class="nav-link" data-page="history">
+                <span class="nav-icon">◷</span>
+                <span>Historical Archive</span>
+            </button>
 
-            <div class="sidebar-bottom">
-                <div class="sidebar-status">
-                    <span class="status-dot"></span>
-                    <span id="connection-status">CONNECTING TO DATA</span>
-                </div>
+        </nav>
 
-                <div class="sidebar-version">
-                    THE MONETARY ARCHIVE<br>
-                    EDITION 2026
-                </div>
-            </div>
+        <div class="sidebar-bottom">
 
-        </aside>
+            <div class="sidebar-divider"></div>
 
-        <main class="main">
-
-            <header class="topbar">
+            <div class="sidebar-status">
+                <span class="status-dot" id="status-dot"></span>
 
                 <div>
-                    <div class="topbar-label">GLOBAL FINANCIAL OBSERVATORY</div>
-                    <div class="topbar-title" id="current-section-title">
-                        Overview
-                    </div>
-                </div>
-
-                <div class="topbar-controls">
-
-                    <div class="update-indicator">
-                        <span class="status-dot"></span>
-                        <span id="last-update">Awaiting data</span>
+                    <div class="status-title" id="connection-status">
+                        CONNECTING
                     </div>
 
-                    <label class="currency-selector">
-                        <span>DISPLAY CURRENCY</span>
+                    <div class="status-description">
+                        External data sources
+                    </div>
+                </div>
+            </div>
 
-                        <select id="display-currency">
-                            <option value="USD">USD</option>
-                            <option value="EUR">EUR</option>
-                            <option value="GBP">GBP</option>
-                            <option value="CHF">CHF</option>
-                            <option value="JPY">JPY</option>
-                            <option value="PLN">PLN</option>
-                            <option value="CAD">CAD</option>
-                            <option value="AUD">AUD</option>
-                            <option value="CNY">CNY</option>
-                            <option value="INR">INR</option>
-                            <option value="BRL">BRL</option>
-                            <option value="SEK">SEK</option>
-                            <option value="NOK">NOK</option>
-                            <option value="DKK">DKK</option>
-                            <option value="CZK">CZK</option>
-                            <option value="HUF">HUF</option>
-                        </select>
-                    </label>
+            <div class="sidebar-footer">
+                ESTABLISHED MMXXVI
+            </div>
 
-                    <button class="refresh-button" id="refresh-data" title="Refresh data">
-                        ↻
-                    </button>
+        </div>
 
+    </aside>
+
+
+    <main class="main-area">
+
+        <header class="topbar">
+
+            <div class="topbar-left">
+
+                <div class="breadcrumb">
+                    THE MONETARY ARCHIVE
+                    <span>/</span>
+                    <strong id="current-section-title">Overview</strong>
                 </div>
 
-            </header>
-
-            <div id="page-content" class="page-content">
-
-                <section class="loading-screen">
-                    <div class="loading-emblem">M.A.</div>
-                    <div class="loading-title">THE MONETARY ARCHIVE</div>
-                    <div class="loading-subtitle">INITIALIZING FINANCIAL DATABASE</div>
-                    <div class="loading-line"></div>
-                </section>
+                <div class="topbar-date" id="current-date"></div>
 
             </div>
 
-            <footer class="footer">
-                <span>THE MONETARY ARCHIVE</span>
-                <span>INDEPENDENT FINANCIAL INFORMATION PROJECT</span>
-                <span id="footer-year">2026</span>
-            </footer>
+            <div class="topbar-right">
 
-        </main>
+                <div class="currency-selector">
 
-    </div>
+                    <label for="display-currency">DISPLAY IN</label>
+
+                    <select id="display-currency">
+                        <option value="USD" selected>USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                        <option value="CHF">CHF</option>
+                        <option value="JPY">JPY</option>
+                        <option value="PLN">PLN</option>
+                        <option value="CAD">CAD</option>
+                        <option value="AUD">AUD</option>
+                        <option value="CNY">CNY</option>
+                        <option value="INR">INR</option>
+                        <option value="BRL">BRL</option>
+                        <option value="SEK">SEK</option>
+                        <option value="NOK">NOK</option>
+                        <option value="DKK">DKK</option>
+                        <option value="CZK">CZK</option>
+                        <option value="HUF">HUF</option>
+                    </select>
+
+                </div>
+
+                <button
+                    class="refresh-button"
+                    id="refresh-data"
+                    title="Refresh data"
+                    aria-label="Refresh data"
+                >
+                    ↻
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <div class="content-wrapper">
+
+            <div class="page-content" id="page-content">
+
+                <div class="initial-loading">
+                    <div class="loading-emblem">M</div>
+                    <div>OPENING THE ARCHIVE</div>
+                    <div class="loading-line"></div>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <footer class="main-footer">
+
+            <span>THE MONETARY ARCHIVE</span>
+
+            <span id="last-update">Awaiting data</span>
+
+            <span>INFORMATIONAL FINANCIAL RECORDS</span>
+
+        </footer>
+
+    </main>
+
+</div>
+
 </body>
 </html>
