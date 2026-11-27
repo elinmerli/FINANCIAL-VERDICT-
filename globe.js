@@ -1,185 +1,179 @@
+"use strict";
 
-(function () {
-    "use strict";
+window.initializeArchiveGlobe = async function (options = {}) {
 
-    let globe = null;
-    let countries = [];
-    let initialized = false;
+    const container = document.getElementById("globe-container");
 
-    const container = () => document.getElementById("globeViz");
-
-    function showMessage(message) {
-        const element = container();
-
-        if (element) {
-            element.innerHTML = '<div class="loading-message">' + message + "</div>";
-        }
+    if (!container) {
+        return;
     }
 
-    async function loadCountryShapes() {
-        const response = await fetch(
-            "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson"
-        );
+    if (typeof window.Globe !== "function") {
+        container.innerHTML = `
+            <div class="empty-state">
+                The 3D globe library could not be loaded.
+                Check your internet connection and reload the page.
+            </div>
+        `;
+
+        return;
+    }
+
+    if (container.dataset.initialized === "true") {
+        return;
+    }
+
+    container.dataset.initialized = "true";
+
+    const GEOJSON_URL =
+        "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson";
+
+    try {
+        const response = await fetch(GEOJSON_URL);
 
         if (!response.ok) {
-            throw new Error("Could not load country boundaries.");
+            throw new Error(`Geographic data error: ${response.status}`);
         }
 
-        const geojson = await response.json();
+        const geoData = await response.json();
 
-        return (geojson.features || []).filter(feature => {
-            return feature.geometry && feature.properties;
-        });
-    }
-
-    function getCountryCode(feature) {
-        const props = feature.properties || {};
-
-        return (
-            props.ADM0_A3 ||
-            props.ISO_A3 ||
-            props.SOV_A3 ||
-            ""
-        );
-    }
-
-    function getCountryName(feature) {
-        const props = feature.properties || {};
-
-        return (
-            props.ADMIN ||
-            props.NAME ||
-            props.NAME_EN ||
-            "Unknown country"
-        );
-    }
-
-    function selectCountry(feature) {
-        const name = getCountryName(feature);
-        const code = getCountryCode(feature);
-
-        document.dispatchEvent(new CustomEvent("archive:country-selected", {
-            detail: {
-                name,
-                iso3: code,
-                feature
-            }
-        }));
-    }
-
-    async function initGlobe() {
-        if (initialized) return;
-
-        const element = container();
-
-        if (!element) return;
-
-        if (typeof window.Globe !== "function") {
-            showMessage("The globe library could not be loaded. Check your internet connection.");
-            return;
+        if (!geoData || !Array.isArray(geoData.features)) {
+            throw new Error("Invalid geographic dataset.");
         }
 
-        showMessage("Preparing the geographical archive...");
+        const width = Math.max(container.clientWidth, 300);
+        const height = Math.max(container.clientHeight, 400);
 
-        try {
-            countries = await loadCountryShapes();
+        const globe = Globe()(container)
 
-            element.innerHTML = "";
+            .width(width)
+            .height(height)
 
-            globe = window.Globe()(element)
-                .width(element.clientWidth)
-                .height(element.clientHeight)
-                .backgroundColor("#11110f")
-                .showAtmosphere(true)
-                .atmosphereColor("#9c8455")
-                .atmosphereAltitude(0.13)
-                .globeImageUrl(
-                    "https://unpkg.com/three-globe/example/img/earth-night.jpg"
-                )
-                .polygonsData(countries)
-                .polygonGeoJsonGeometry(feature => feature.geometry)
-                .polygonCapColor(() => "rgba(151, 125, 75, 0.10)")
-                .polygonSideColor(() => "rgba(151, 125, 75, 0.12)")
-                .polygonStrokeColor(() => "rgba(205, 178, 123, 0.55)")
-                .polygonAltitude(0.006)
-                .polygonLabel(feature => {
-                    return "<b>" + getCountryName(feature) + "</b>";
-                })
-                .onPolygonClick(feature => selectCountry(feature))
-                .onPolygonHover(feature => {
-                    if (feature) {
-                        globe.polygonCapColor(item =>
-                            item === feature
-                                ? "rgba(190, 160, 98, 0.48)"
-                                : "rgba(151, 125, 75, 0.10)"
-                        );
-                    } else {
-                        globe.polygonCapColor(() => "rgba(151, 125, 75, 0.10)");
-                    }
+            .backgroundColor("#10100f")
+
+            .globeImageUrl(
+                "https://unpkg.com/three-globe/example/img/earth-night.jpg"
+            )
+
+            .bumpImageUrl(
+                "https://unpkg.com/three-globe/example/img/earth-topology.png"
+            )
+
+            .showAtmosphere(true)
+
+            .atmosphereColor("#75684e")
+
+            .atmosphereAltitude(0.13)
+
+            .polygonsData(geoData.features)
+
+            .polygonAltitude(feature => {
+                return feature === selectedCountry ? 0.025 : 0.008;
+            })
+
+            .polygonCapColor(feature => {
+                return feature === selectedCountry
+                    ? "rgba(190,157,101,0.65)"
+                    : "rgba(125,112,84,0.16)";
+            })
+
+            .polygonSideColor(() => "rgba(70,62,47,0.15)")
+
+            .polygonStrokeColor(() => "rgba(181,157,113,0.45)")
+
+            .polygonLabel(feature => {
+                const name =
+                    feature.properties?.ADMIN ||
+                    feature.properties?.NAME ||
+                    feature.properties?.name ||
+                    "Unknown territory";
+
+                return `
+                    <div style="
+                        padding:9px 12px;
+                        background:#191916;
+                        border:1px solid #806d4d;
+                        color:#e6dfd0;
+                        font-family:Arial,sans-serif;
+                        font-size:12px;
+                    ">
+                        ${escapeGlobeText(name)}
+                    </div>
+                `;
+            })
+
+            .onPolygonClick(feature => {
+                selectedCountry = feature;
+
+                if (typeof options.onCountrySelected === "function") {
+                    options.onCountrySelected(feature);
+                }
+
+                globe.polygonsData([]);
+
+                requestAnimationFrame(() => {
+                    globe.polygonsData(geoData.features);
                 });
-
-            const controls = globe.controls();
-            controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.35;
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.08;
-
-            globe.pointOfView({
-                lat: 20,
-                lng: 5,
-                altitude: 2.2
             });
 
-            initialized = true;
+        let selectedCountry = null;
 
-            window.addEventListener("resize", resizeGlobe);
+        const controls = globe.controls();
 
-            document.getElementById("globeZoomIn")?.addEventListener("click", () => {
-                changeZoom(0.75);
-            });
-
-            document.getElementById("globeZoomOut")?.addEventListener("click", () => {
-                changeZoom(1.3);
-            });
-
-            document.getElementById("globeReset")?.addEventListener("click", () => {
-                globe.pointOfView({
-                    lat: 20,
-                    lng: 5,
-                    altitude: 2.2
-                }, 800);
-            });
-
-        } catch (error) {
-            console.error("Globe error:", error);
-            showMessage("The globe could not be loaded. Please refresh the page.");
-        }
-    }
-
-    function changeZoom(multiplier) {
-        if (!globe) return;
-
-        const current = globe.pointOfView();
-        const nextAltitude = Math.max(
-            0.8,
-            Math.min(4.5, current.altitude * multiplier)
-        );
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.35;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.minDistance = 130;
+        controls.maxDistance = 500;
 
         globe.pointOfView({
-            ...current,
-            altitude: nextAltitude
-        }, 350);
+            lat: 20,
+            lng: 0,
+            altitude: 2.2
+        });
+
+        const resizeObserver = new ResizeObserver(() => {
+            const newWidth = container.clientWidth;
+            const newHeight = container.clientHeight;
+
+            if (newWidth > 0 && newHeight > 0) {
+                globe
+                    .width(newWidth)
+                    .height(newHeight);
+            }
+        });
+
+        resizeObserver.observe(container);
+
+        container.dataset.initialized = "true";
+
+        container._archiveGlobe = {
+            instance: globe,
+            resizeObserver
+        };
+
+    } catch (error) {
+        console.error("Globe initialization failed:", error);
+
+        container.dataset.initialized = "false";
+
+        container.innerHTML = `
+            <div class="empty-state">
+                <h3>Global atlas unavailable</h3>
+                <p>${escapeGlobeText(error.message)}</p>
+                <p>Check your connection and try opening this section again.</p>
+            </div>
+        `;
     }
+};
 
-    function resizeGlobe() {
-        if (!globe || !container()) return;
-
-        globe
-            .width(container().clientWidth)
-            .height(container().clientHeight);
-    }
-
-    window.ArchiveGlobe = {
-        init: initGlobe
-    };
-})();
+function escapeGlobeText(value) {
+    return String(value ?? "").replace(/[&<>"']/g, character => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+    })[character]);
+}
