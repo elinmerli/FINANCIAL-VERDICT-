@@ -1,2058 +1,694 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#090a0d">
-<title>The Monetary Archive</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="https://unpkg.com/globe.gl@2.41.12/dist/globe.gl.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
-
-<style>
-:root {
-    --bg: #090a0d;
-    --panel: #111318;
-    --panel2: #17191f;
-    --gold: #b89a60;
-    --gold2: #dfc58e;
-    --text: #e9e3d7;
-    --muted: #898782;
-    --line: rgba(184,154,96,.22);
-    --green: #83a88b;
-    --red: #b87878;
-    --sidebar: 245px;
-}
-
-* { box-sizing: border-box; }
-
-body {
-    margin: 0;
-    background:
-        radial-gradient(ellipse at 75% 0%, #242019 0%, transparent 36%),
-        var(--bg);
-    color: var(--text);
-    font-family: "DM Sans", sans-serif;
-    font-size: 13px;
-}
-
-button, input, select {
-    font: inherit;
-}
-
-button, select {
-    cursor: pointer;
-}
-
-button {
-    color: inherit;
-}
-
-button:focus-visible,
-input:focus-visible,
-select:focus-visible {
-    outline: 1px solid var(--gold);
-    outline-offset: 3px;
-}
-
-.topbar {
-    height: 78px;
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 30px;
-    background: rgba(9,10,13,.96);
-    border-bottom: 1px solid var(--line);
-    backdrop-filter: blur(15px);
-}
-
-.brand {
-    display: flex;
-    align-items: center;
-    gap: 13px;
-}
-
-.brand-emblem {
-    width: 43px;
-    height: 43px;
-    border: 1px solid var(--gold);
-    color: var(--gold2);
-    display: grid;
-    place-items: center;
-    font-size: 20px;
-}
-
-.brand-name {
-    font-family: "Cormorant Garamond", serif;
-    letter-spacing: 3px;
-    font-size: 19px;
-    color: var(--gold2);
-}
-
-.brand-subtitle {
-    color: var(--muted);
-    font-size: 9px;
-    letter-spacing: 1.5px;
-    margin-top: 3px;
-    text-transform: uppercase;
-}
-
-.header-tools {
-    display: flex;
-    align-items: center;
-    gap: 22px;
-}
-
-.header-search {
-    position: relative;
-}
-
-.header-search input {
-    width: 190px;
-    background: #14161b;
-    border: 1px solid var(--line);
-    padding: 10px 12px;
-    color: var(--text);
-}
-
-.header-tools select,
-select,
-input {
-    background: #17191f;
-    color: var(--text);
-    border: 1px solid var(--line);
-    padding: 9px 11px;
-    min-width: 0;
-}
-
-.live {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--green);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.live-dot {
-    width: 7px;
-    height: 7px;
-    background: var(--green);
-    border-radius: 50%;
-    box-shadow: 0 0 10px var(--green);
-}
-
-.clock {
-    color: var(--gold2);
-    font-variant-numeric: tabular-nums;
-}
-
-.layout {
-    display: grid;
-    grid-template-columns: var(--sidebar) minmax(0,1fr);
-    min-height: calc(100vh - 78px);
-}
-
-.sidebar {
-    position: sticky;
-    top: 78px;
-    height: calc(100vh - 78px);
-    border-right: 1px solid var(--line);
-    padding: 25px 14px;
-    display: flex;
-    flex-direction: column;
-    background: rgba(12,13,17,.88);
-}
-
-.nav-label {
-    color: var(--gold);
-    font-size: 9px;
-    letter-spacing: 2px;
-    padding: 0 12px;
-    margin: 12px 0;
-}
-
-.nav-button {
-    border: 0;
-    background: transparent;
-    color: #99958e;
-    padding: 13px 12px;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    gap: 13px;
-    width: 100%;
-    transition: .2s;
-    border-left: 2px solid transparent;
-}
-
-.nav-button:hover,
-.nav-button.active {
-    color: var(--gold2);
-    background: linear-gradient(90deg,rgba(184,154,96,.14),transparent);
-    border-left-color: var(--gold);
-}
-
-.nav-button i {
-    width: 18px;
-    text-align: center;
-}
-
-.sidebar-bottom {
-    margin-top: auto;
-    border-top: 1px solid var(--line);
-    padding: 18px 10px 0;
-    color: var(--muted);
-    font-size: 9px;
-    line-height: 1.8;
-    letter-spacing: 1px;
-}
-
-main {
-    padding: 28px;
-    min-width: 0;
-    max-width: 1800px;
-    width: 100%;
-    margin: 0 auto;
-}
-
-.page { display: none; }
-.page.active { display: block; }
-
-.page-heading {
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    gap: 20px;
-    margin-bottom: 25px;
-}
-
-.eyebrow {
-    color: var(--gold);
-    letter-spacing: 2.5px;
-    font-size: 9px;
-    text-transform: uppercase;
-}
-
-h1, h2, h3, p { margin-top: 0; }
-
-h1 {
-    font: 500 43px "Cormorant Garamond", serif;
-    margin: 8px 0 4px;
-    color: var(--gold2);
-}
-
-h2 {
-    font: 500 24px "Cormorant Garamond", serif;
-    color: var(--gold2);
-    margin-bottom: 0;
-}
-
-h3 { font-weight: 500; }
-
-.subheading {
-    color: var(--muted);
-    font-size: 11px;
-    margin-top: 7px;
-}
-
-.grid {
-    display: grid;
-    grid-template-columns: repeat(12,minmax(0,1fr));
-    gap: 15px;
-}
-
-.panel {
-    background: linear-gradient(145deg,#17191e,#101216);
-    border: 1px solid var(--line);
-    padding: 20px;
-    min-width: 0;
-    position: relative;
-}
-
-.panel-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 17px;
-}
-
-.panel-title small {
-    color: var(--muted);
-}
-
-.hero {
-    grid-column: span 8;
-    min-height: 285px;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-    background:
-        linear-gradient(90deg,rgba(10,11,14,.98) 0%,rgba(10,11,14,.83) 53%,rgba(10,11,14,.25)),
-        radial-gradient(circle at 80% 45%,#655333,#171512 55%,#101115);
-}
-
-.hero h1 {
-    font-size: clamp(42px,5vw,67px);
-    line-height: .98;
-    max-width: 550px;
-}
-
-.hero p {
-    color: #aaa59a;
-    max-width: 420px;
-    line-height: 1.8;
-    margin: 18px 0 22px;
-}
-
-.hero-art {
-    position: absolute;
-    right: 5%;
-    font-size: clamp(120px,18vw,245px);
-    color: rgba(190,158,96,.14);
-    pointer-events: none;
-}
-
-.gold-button,
-.outline-button,
-.small-button {
-    border: 1px solid var(--gold);
-    padding: 11px 16px;
-    background: var(--gold);
-    color: #111;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    transition: .2s;
-}
-
-.gold-button:hover {
-    background: var(--gold2);
-}
-
-.outline-button,
-.small-button {
-    background: transparent;
-    color: var(--gold2);
-}
-
-.outline-button:hover,
-.small-button:hover {
-    background: rgba(184,154,96,.12);
-}
-
-.metric {
-    grid-column: span 3;
-    min-height: 155px;
-}
-
-.metric-label {
-    color: var(--muted);
-    font-size: 10px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-}
-
-.metric-value {
-    font: 500 30px "Cormorant Garamond",serif;
-    margin: 14px 0 6px;
-    color: var(--gold2);
-    overflow-wrap: anywhere;
-}
-
-.metric-foot {
-    color: var(--muted);
-    font-size: 10px;
-}
-
-.positive { color: var(--green)!important; }
-.negative { color: var(--red)!important; }
-
-.span-4 { grid-column: span 4; }
-.span-5 { grid-column: span 5; }
-.span-6 { grid-column: span 6; }
-.span-7 { grid-column: span 7; }
-.span-8 { grid-column: span 8; }
-.span-12 { grid-column: span 12; }
-
-.rate-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 12px;
-    align-items: center;
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(184,154,96,.12);
-}
-
-.rate-row:last-child { border-bottom: 0; }
-
-.rate-code { color: var(--gold2); font-weight: 600; }
-.rate-name { color: var(--muted); font-size: 10px; }
-.rate-value { font-variant-numeric: tabular-nums; }
-
-.chart-box {
-    height: 290px;
-    position: relative;
-}
-
-.chart-box canvas {
-    width: 100%!important;
-    height: 100%!important;
-}
-
-.table-wrap { overflow-x: auto; }
-
-table {
-    border-collapse: collapse;
-    width: 100%;
-    min-width: 600px;
-}
-
-th {
-    color: var(--gold);
-    text-transform: uppercase;
-    font-size: 9px;
-    letter-spacing: 1px;
-    font-weight: 500;
-    text-align: left;
-    padding: 13px 10px;
-    border-bottom: 1px solid var(--line);
-}
-
-td {
-    padding: 13px 10px;
-    border-bottom: 1px solid rgba(184,154,96,.1);
-    color: #d3cec3;
-    font-size: 11px;
-}
-
-tbody tr:hover { background: rgba(184,154,96,.06); }
-
-input[type="number"], input[type="text"], input[type="date"], input[type="search"] {
-    width: 100%;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 13px;
-}
-
-.field {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    color: var(--muted);
-    font-size: 10px;
-}
-
-.result {
-    border: 1px solid var(--line);
-    background: rgba(184,154,96,.06);
-    padding: 15px;
-    color: var(--gold2);
-    margin-top: 15px;
-    font: 500 22px "Cormorant Garamond",serif;
-    overflow-wrap: anywhere;
-}
-
-.toolbar {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 15px;
-}
-
-.toolbar select { min-width: 130px; }
-
-.globe-layout {
-    display: grid;
-    grid-template-columns: minmax(0,1.7fr) minmax(250px,.8fr);
-    gap: 15px;
-}
-
-#globe {
-    height: 560px;
-    min-height: 400px;
-    background: radial-gradient(circle,#1d2027,#090b10 70%);
-    overflow: hidden;
-}
-
-.country-panel { min-height: 300px; }
-
-.country-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    border-bottom: 1px solid var(--line);
-    padding: 13px 0;
-}
-
-.country-row span:first-child { color: var(--muted); }
-.country-row strong { text-align: right; }
-
-.notice {
-    color: var(--muted);
-    font-size: 10px;
-    line-height: 1.7;
-    margin-top: 14px;
-}
-
-.status {
-    position: fixed;
-    bottom: 18px;
-    right: 18px;
-    z-index: 50;
-    background: #202127;
-    border: 1px solid var(--line);
-    color: var(--gold2);
-    padding: 12px 17px;
-    max-width: 340px;
-    box-shadow: 0 8px 30px #0008;
-    display: none;
-}
-
-.status.show { display: block; }
-
-.footer {
-    border-top: 1px solid var(--line);
-    margin-top: 35px;
-    padding: 20px 0;
-    color: var(--muted);
-    font-size: 9px;
-    letter-spacing: 1px;
-    display: flex;
-    justify-content: space-between;
-    gap: 15px;
-}
-
-@media(max-width:1100px) {
-    :root { --sidebar: 205px; }
-    .hero { grid-column: span 12; }
-    .metric { grid-column: span 6; }
-    .span-4,.span-5,.span-6,.span-7,.span-8 { grid-column: span 6; }
-}
-
-@media(max-width:760px) {
-    .topbar { height: auto; min-height: 70px; padding: 12px 15px; }
-    .header-tools { gap: 8px; }
-    .header-search, .clock { display: none; }
-    .brand-name { font-size: 14px; letter-spacing: 1px; }
-    .brand-subtitle { font-size: 7px; }
-    .layout { display: block; }
-    .sidebar {
-        position: relative;
-        top: 0;
-        height: auto;
-        padding: 8px;
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
-        overflow-x: auto;
-    }
-    .nav-label, .sidebar-bottom { display: none; }
-    .main-navigation {
-        display: flex;
-        min-width: max-content;
-    }
-    .nav-button {
-        width: auto;
-        padding: 12px;
-        font-size: 10px;
-        border-left: 0;
-        border-bottom: 2px solid transparent;
-    }
-    .nav-button.active { border-bottom-color: var(--gold); }
-    main { padding: 17px 12px; }
-    .metric { grid-column: span 6; }
-    .span-4,.span-5,.span-6,.span-7,.span-8 { grid-column: span 12; }
-    .globe-layout { grid-template-columns: 1fr; }
-    #globe { height: 400px; }
-    .page-heading { align-items: start; flex-direction: column; }
-}
-
-@media(max-width:430px) {
-    .metric { grid-column: span 12; }
-    .form-grid { grid-template-columns: 1fr; }
-    h1 { font-size: 36px; }
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#10100f">
+  <title>The Monetary Archive</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/globe.gl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <script defer src="data.js"></script>
+  <script defer src="globe.js"></script>
+  <script defer src="script.js"></script>
 </head>
 
 <body>
+  <div class="page-shell">
 
-<header class="topbar">
-    <div class="brand">
-        <div class="brand-emblem"><i class="fa-solid fa-landmark"></i></div>
-        <div>
-            <div class="brand-name">THE MONETARY ARCHIVE</div>
-            <div class="brand-subtitle">International financial observatory</div>
+    <header class="topbar">
+      <a class="brand" href="#overview" aria-label="The Monetary Archive">
+        <span class="brand-mark">M</span>
+        <span class="brand-copy">
+          <strong>THE MONETARY ARCHIVE</strong>
+          <small>INTERNATIONAL FINANCIAL OBSERVATORY</small>
+        </span>
+      </a>
+
+      <div class="topbar-right">
+        <div class="live-indicator">
+          <span class="live-dot"></span>
+          DATA CONNECTION
         </div>
+
+        <label class="currency-switch">
+          <span>DISPLAY IN</span>
+          <select id="displayCurrency" aria-label="Валюта отображения">
+            <option value="USD" selected>USD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="CHF">CHF</option>
+            <option value="JPY">JPY</option>
+            <option value="PLN">PLN</option>
+            <option value="CAD">CAD</option>
+            <option value="AUD">AUD</option>
+            <option value="CNY">CNY</option>
+            <option value="INR">INR</option>
+            <option value="BRL">BRL</option>
+            <option value="SEK">SEK</option>
+            <option value="NOK">NOK</option>
+            <option value="DKK">DKK</option>
+            <option value="CZK">CZK</option>
+            <option value="HUF">HUF</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <div class="masthead">
+      <div>
+        <div class="eyebrow">EST. MMXXIV · GLOBAL FINANCIAL RECORDS</div>
+        <h1>The Monetary <em>Archive</em></h1>
+        <p class="masthead-description">
+          An independent observatory of currencies, commodities,
+          markets and the global economy.
+        </p>
+      </div>
+
+      <div class="masthead-date">
+        <span>ARCHIVE STATUS</span>
+        <strong id="currentDate">—</strong>
+        <small id="lastUpdated">Awaiting data</small>
+      </div>
     </div>
 
-    <div class="header-tools">
-        <div class="header-search">
-            <input id="globalSearch" type="search" placeholder="Search archive...">
-        </div>
-        <select id="displayCurrency" aria-label="Display currency">
-            <option>USD</option><option>EUR</option><option>GBP</option>
-            <option>CHF</option><option>PLN</option><option>JPY</option>
-            <option>CAD</option><option>AUD</option>
-        </select>
-        <div class="live"><span class="live-dot"></span><span id="connection">Connecting</span></div>
-        <div class="clock" id="clock">--:--:--</div>
-    </div>
-</header>
-
-<div class="layout">
-<aside class="sidebar">
-    <div class="nav-label">ARCHIVE</div>
-    <nav class="main-navigation">
-        <button class="nav-button active" data-page="dashboard"><i class="fa-solid fa-house"></i> Dashboard</button>
-        <button class="nav-button" data-page="currencies"><i class="fa-solid fa-coins"></i> Currencies</button>
-        <button class="nav-button" data-page="gold"><i class="fa-solid fa-gem"></i> Gold</button>
-        <button class="nav-button" data-page="bitcoin"><i class="fa-brands fa-bitcoin"></i> Markets & Bitcoin</button>
-        <button class="nav-button" data-page="economy"><i class="fa-solid fa-building-columns"></i> Economy</button>
-        <button class="nav-button" data-page="globe-page"><i class="fa-solid fa-earth-europe"></i> Global Globe</button>
-        <button class="nav-button" data-page="calculators"><i class="fa-solid fa-calculator"></i> Calculators</button>
-        <button class="nav-button" data-page="history"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
-        <button class="nav-button" data-page="settings"><i class="fa-solid fa-gear"></i> Settings</button>
+    <nav class="main-nav" aria-label="Основная навигация">
+      <a class="nav-link active" href="#overview">01 / OVERVIEW</a>
+      <a class="nav-link" href="#globe-section">02 / GLOBAL GLOBE</a>
+      <a class="nav-link" href="#currencies">03 / CURRENCIES</a>
+      <a class="nav-link" href="#markets">04 / MARKETS</a>
+      <a class="nav-link" href="#economy">05 / ECONOMY</a>
+      <a class="nav-link" href="#calculators">06 / CALCULATORS</a>
+      <a class="nav-link" href="#history">07 / ARCHIVE</a>
     </nav>
-    <div class="sidebar-bottom">
-        THE MONETARY ARCHIVE<br>
-        INTERNATIONAL FINANCIAL RECORDS<br>
-        ESTABLISHED 2026
-    </div>
-</aside>
 
-<main>
+    <main>
 
-<!-- DASHBOARD -->
-<section class="page active" id="dashboard">
-    <div class="grid">
-        <article class="panel hero span-8">
-            <div style="position:relative;z-index:2">
-                <div class="eyebrow">The world financial observatory</div>
-                <h1>Global Finance.<br>At Your Fingertips.</h1>
-                <p>Explore international currencies, precious metals, digital assets and economic records.</p>
-                <button class="gold-button" data-go="currencies">Explore the Archive <i class="fa-solid fa-arrow-right"></i></button>
-            </div>
-            <div class="hero-art"><i class="fa-solid fa-earth-europe"></i></div>
-        </article>
-
-        <article class="panel span-4">
-            <div class="panel-title"><h2>Exchange Rates</h2><small id="ratesDate">Loading</small></div>
-            <div id="dashboardRates">Loading currency data...</div>
-        </article>
-
-        <article class="panel metric">
-            <div class="metric-label">Gold · per gram</div>
-            <div class="metric-value" id="goldValue">—</div>
-            <div class="metric-foot" id="goldDate">Awaiting source</div>
-        </article>
-
-        <article class="panel metric">
-            <div class="metric-label">Bitcoin · BTC</div>
-            <div class="metric-value" id="btcValue">—</div>
-            <div class="metric-foot" id="btcChange">Awaiting source</div>
-        </article>
-
-        <article class="panel metric">
-            <div class="metric-label">Inflation · Poland</div>
-            <div class="metric-value" id="inflationValue">—</div>
-            <div class="metric-foot" id="inflationYear">World Bank observation</div>
-        </article>
-
-        <article class="panel metric">
-            <div class="metric-label">GDP growth · Poland</div>
-            <div class="metric-value" id="gdpValue">—</div>
-            <div class="metric-foot" id="gdpYear">World Bank observation</div>
-        </article>
-
-        <article class="panel span-8">
-            <div class="panel-title">
-                <div><h2>Market History</h2><small>Bitcoin price history</small></div>
-                <select id="btcPeriod">
-                    <option value="7">7 days</option>
-                    <option value="30" selected>30 days</option>
-                    <option value="90">90 days</option>
-                    <option value="365">1 year</option>
-                </select>
-            </div>
-            <div class="chart-box"><canvas id="btcChart"></canvas></div>
-        </article>
-
-        <article class="panel span-4">
-            <div class="panel-title"><h2>Currency Converter</h2></div>
-            <div class="field">Amount<input id="convertAmount" type="number" min="0" value="100"></div>
-            <div class="form-grid" style="margin-top:12px">
-                <label class="field">From<select id="convertFrom"><option>USD</option><option>EUR</option><option>GBP</option><option>PLN</option><option>CHF</option><option>JPY</option></select></label>
-                <label class="field">To<select id="convertTo"><option>PLN</option><option>USD</option><option>EUR</option><option>GBP</option><option>CHF</option><option>JPY</option></select></label>
-            </div>
-            <button class="gold-button" id="convertButton" style="margin-top:14px;width:100%">Convert</button>
-            <div class="result" id="convertResult">Enter an amount</div>
-            <div class="notice" id="convertRate">Rates supplied by NBP. PLN-based conversion.</div>
-        </article>
-
-        <article class="panel span-12">
-            <div class="panel-title"><h2>Economic Overview</h2><small>World Bank · latest available observations</small></div>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Indicator</th><th>Value</th><th>Country</th><th>Observation year</th><th>Source</th></tr></thead>
-                    <tbody id="overviewEconomy"><tr><td colspan="5">Loading economic indicators...</td></tr></tbody>
-                </table>
-            </div>
-        </article>
-    </div>
-</section>
-
-<!-- CURRENCIES -->
-<section class="page" id="currencies">
-    <div class="page-heading">
-        <div><div class="eyebrow">FOREIGN EXCHANGE ARCHIVE</div><h1>Currencies</h1><div class="subheading">Exchange rates published by the National Bank of Poland.</div></div>
-        <button class="outline-button" id="refreshRates"><i class="fa-solid fa-rotate"></i> Refresh</button>
-    </div>
-    <article class="panel">
-        <div class="toolbar">
-            <input id="currencySearch" type="search" placeholder="Search currency or code...">
-            <select id="currencySort"><option value="code">Sort by code</option><option value="name">Sort by name</option><option value="rate">Rate: low to high</option></select>
+      <!-- OVERVIEW -->
+      <section id="overview" class="section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">01 — THE WORLD AT A GLANCE</div>
+            <h2>Global <em>Overview</em></h2>
+          </div>
+          <div class="section-note">PUBLIC ECONOMIC DATA · LIVE WHERE AVAILABLE</div>
         </div>
+
+        <div class="metric-grid">
+          <article class="metric-card featured">
+            <div class="metric-label">BITCOIN / BTC</div>
+            <div class="metric-value" id="overviewBitcoin">Loading…</div>
+            <div class="metric-change" id="overviewBitcoinChange">Waiting for market data</div>
+            <div class="metric-foot">COINGECKO · MARKET DATA</div>
+          </article>
+
+          <article class="metric-card">
+            <div class="metric-label">GOLD / GRAM</div>
+            <div class="metric-value" id="overviewGold">Loading…</div>
+            <div class="metric-change neutral" id="overviewGoldChange">NBP reference price</div>
+            <div class="metric-foot">NATIONAL BANK OF POLAND</div>
+          </article>
+
+          <article class="metric-card">
+            <div class="metric-label">USD EXCHANGE RATE</div>
+            <div class="metric-value" id="overviewUSD">Loading…</div>
+            <div class="metric-change neutral">Reference rate against PLN</div>
+            <div class="metric-foot">NBP · TABLE A</div>
+          </article>
+
+          <article class="metric-card">
+            <div class="metric-label">EUR EXCHANGE RATE</div>
+            <div class="metric-value" id="overviewEUR">Loading…</div>
+            <div class="metric-change neutral">Reference rate against PLN</div>
+            <div class="metric-foot">NBP · TABLE A</div>
+          </article>
+        </div>
+
+        <div class="overview-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <div class="eyebrow">MARKET MOVEMENT</div>
+                <h3>Bitcoin performance</h3>
+              </div>
+              <span class="source-tag">BTC</span>
+            </div>
+            <div class="chart-toolbar">
+              <button class="period-button active" data-btc-period="1">24H</button>
+              <button class="period-button" data-btc-period="7">7D</button>
+              <button class="period-button" data-btc-period="30">30D</button>
+              <button class="period-button" data-btc-period="90">90D</button>
+              <button class="period-button" data-btc-period="365">1Y</button>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="overviewBitcoinChart"></canvas>
+            </div>
+            <div class="chart-caption" id="bitcoinChartCaption">
+              Historical market data will appear here.
+            </div>
+          </article>
+
+          <article class="panel market-summary">
+            <div class="panel-heading">
+              <div>
+                <div class="eyebrow">MARKET SNAPSHOT</div>
+                <h3>Bitcoin statistics</h3>
+              </div>
+            </div>
+
+            <div class="data-row">
+              <span>Market capitalisation</span>
+              <strong id="bitcoinMarketCap">—</strong>
+            </div>
+            <div class="data-row">
+              <span>24-hour volume</span>
+              <strong id="bitcoinVolume">—</strong>
+            </div>
+            <div class="data-row">
+              <span>24-hour high</span>
+              <strong id="bitcoinHigh">—</strong>
+            </div>
+            <div class="data-row">
+              <span>24-hour low</span>
+              <strong id="bitcoinLow">—</strong>
+            </div>
+            <div class="data-row">
+              <span>Circulating supply</span>
+              <strong id="bitcoinSupply">—</strong>
+            </div>
+            <div class="data-row">
+              <span>Last updated</span>
+              <strong id="bitcoinUpdated">—</strong>
+            </div>
+          </article>
+        </div>
+
+        <div class="section-heading subsection-heading">
+          <div>
+            <div class="eyebrow">REFERENCE BOARD</div>
+            <h3>Selected exchange rates</h3>
+          </div>
+          <a class="text-link" href="#currencies">FULL CURRENCY REGISTER →</a>
+        </div>
+
         <div class="table-wrap">
-            <table><thead><tr><th>Currency</th><th>Code</th><th>PLN per unit</th><th>Selected currency</th><th>Source</th></tr></thead>
-            <tbody id="currencyTable"><tr><td colspan="5">Loading...</td></tr></tbody></table>
+          <table>
+            <thead>
+              <tr>
+                <th>CURRENCY</th>
+                <th>NAME</th>
+                <th>VALUE IN DISPLAY CURRENCY</th>
+                <th>REFERENCE</th>
+              </tr>
+            </thead>
+            <tbody id="overviewCurrencyRows">
+              <tr><td colspan="4" class="loading-cell">Loading currency records…</td></tr>
+            </tbody>
+          </table>
         </div>
-        <p class="notice">NBP exchange rates are published on business days. This is not a tick-by-tick foreign exchange feed.</p>
-    </article>
-</section>
+      </section>
 
-<!-- GOLD -->
-<section class="page" id="gold">
-    <div class="page-heading"><div><div class="eyebrow">PRECIOUS METALS ARCHIVE</div><h1>Gold</h1><div class="subheading">Official NBP gold price records.</div></div></div>
-    <div class="grid">
-        <article class="panel metric span-4"><div class="metric-label">Price per gram</div><div class="metric-value" id="goldPageGram">—</div><div class="metric-foot" id="goldPageDate">—</div></article>
-        <article class="panel metric span-4"><div class="metric-label">Price per troy ounce</div><div class="metric-value" id="goldPageOunce">—</div><div class="metric-foot">31.1034768 grams</div></article>
-        <article class="panel metric span-4"><div class="metric-label">Source</div><div class="metric-value" style="font-size:23px">NBP</div><div class="metric-foot">National Bank of Poland</div></article>
-        <article class="panel span-12">
-            <div class="panel-title"><h2>Recent Gold Prices</h2><select id="goldDays"><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></div>
-            <div class="chart-box"><canvas id="goldChart"></canvas></div>
-            <div class="notice">Historical values are NBP quotations in PLN per gram. Converted values use the latest available currency rates.</div>
+      <!-- GLOBE -->
+      <section id="globe-section" class="section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">02 — GEOGRAPHICAL ECONOMICS</div>
+            <h2>The Global <em>Globe</em></h2>
+          </div>
+          <div class="section-note">SELECT A COUNTRY TO EXAMINE ITS ECONOMY</div>
+        </div>
+
+        <div class="globe-layout">
+          <article class="globe-panel">
+            <div class="globe-toolbar">
+              <span><i class="live-dot"></i> INTERACTIVE ATLAS</span>
+              <div class="globe-controls">
+                <button id="globeZoomIn" aria-label="Увеличить глобус">+</button>
+                <button id="globeZoomOut" aria-label="Уменьшить глобус">−</button>
+                <button id="globeReset" aria-label="Сбросить вид">RESET</button>
+              </div>
+            </div>
+            <div id="globeViz">
+              <div class="globe-loading">Preparing geographical archive…</div>
+            </div>
+            <div class="globe-legend">
+              <span><i class="legend-dot gold"></i> COUNTRY BOUNDARIES</span>
+              <span><i class="legend-dot cream"></i> SELECTED COUNTRY</span>
+              <span>DRAG TO ROTATE · SCROLL TO ZOOM</span>
+            </div>
+          </article>
+
+          <aside class="country-panel">
+            <div class="eyebrow">COUNTRY DOSSIER</div>
+            <h3 id="countryName">Select a country</h3>
+            <p class="country-intro" id="countryIntro">
+              Choose a territory on the globe to inspect its available economic records.
+            </p>
+
+            <div class="country-stat">
+              <span>GDP GROWTH</span>
+              <strong id="countryGDP">—</strong>
+              <small id="countryGDPYear">No country selected</small>
+            </div>
+            <div class="country-stat">
+              <span>INFLATION</span>
+              <strong id="countryInflation">—</strong>
+              <small id="countryInflationYear">—</small>
+            </div>
+            <div class="country-stat">
+              <span>UNEMPLOYMENT</span>
+              <strong id="countryUnemployment">—</strong>
+              <small id="countryUnemploymentYear">—</small>
+            </div>
+
+            <div class="country-meta">
+              <div><span>ISO CODE</span><strong id="countryISO">—</strong></div>
+              <div><span>DATA SOURCE</span><strong>WORLD BANK</strong></div>
+            </div>
+            <p class="small-note">
+              Figures are the latest available annual observations, not live readings.
+              Missing observations are shown as unavailable.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <!-- CURRENCIES -->
+      <section id="currencies" class="section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">03 — FOREIGN EXCHANGE REGISTER</div>
+            <h2>Currency <em>Exchange</em></h2>
+          </div>
+          <div class="section-note">NBP OFFICIAL REFERENCE RATES</div>
+        </div>
+
+        <div class="toolbar-row">
+          <input id="currencySearch" class="search-input" type="search"
+                 placeholder="Search by currency, code or name…">
+          <select id="currencySort" class="dark-select" aria-label="Сортировка валют">
+            <option value="code">Sort: currency code</option>
+            <option value="name">Sort: currency name</option>
+            <option value="value-high">Sort: highest value</option>
+            <option value="value-low">Sort: lowest value</option>
+          </select>
+          <button id="refreshData" class="outline-button">↻ REFRESH DATA</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>CODE</th>
+                <th>CURRENCY</th>
+                <th>VALUE</th>
+                <th>VALUE IN DISPLAY CURRENCY</th>
+                <th>RATE DATE</th>
+                <th>SOURCE</th>
+              </tr>
+            </thead>
+            <tbody id="currencyRows">
+              <tr><td colspan="6" class="loading-cell">Loading official rates…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span id="currencyCount">— records</span>
+          <span id="currencySourceDate">Source date: —</span>
+        </div>
+      </section>
+
+      <!-- MARKETS -->
+      <section id="markets" class="section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">04 — DIGITAL ASSETS & COMMODITIES</div>
+            <h2>Markets & <em>Bitcoin</em></h2>
+          </div>
+          <div class="section-note">PUBLIC MARKET DATA</div>
+        </div>
+
+        <div class="market-grid">
+          <article class="panel bitcoin-main">
+            <div class="panel-heading">
+              <div>
+                <div class="eyebrow">DIGITAL ASSET · BTC</div>
+                <h3>Bitcoin</h3>
+              </div>
+              <span class="source-tag">COINGECKO</span>
+            </div>
+            <div class="large-market-value" id="marketBitcoinPrice">—</div>
+            <div class="metric-change" id="marketBitcoinChange">Awaiting market data</div>
+            <div class="market-detail-grid">
+              <div><span>MARKET CAP</span><strong id="marketBitcoinCap">—</strong></div>
+              <div><span>24H VOLUME</span><strong id="marketBitcoinVolume">—</strong></div>
+              <div><span>24H HIGH</span><strong id="marketBitcoinHigh">—</strong></div>
+              <div><span>24H LOW</span><strong id="marketBitcoinLow">—</strong></div>
+            </div>
+          </article>
+
+          <article class="panel gold-main">
+            <div class="panel-heading">
+              <div>
+                <div class="eyebrow">PRECIOUS METAL · XAU</div>
+                <h3>Gold reference</h3>
+              </div>
+              <span class="source-tag">NBP</span>
+            </div>
+            <div class="large-market-value" id="marketGoldGram">—</div>
+            <div class="gold-unit">PER GRAM · <span id="goldCurrencyLabel">USD</span></div>
+            <div class="market-detail-grid">
+              <div><span>PRICE PER TROY OUNCE</span><strong id="marketGoldOunce">—</strong></div>
+              <div><span>REFERENCE DATE</span><strong id="marketGoldDate">—</strong></div>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <div>
+              <div class="eyebrow">PRICE HISTORY</div>
+              <h3>Bitcoin historical record</h3>
+            </div>
+            <div class="chart-toolbar">
+              <button class="period-button active" data-btc-period="1">24H</button>
+              <button class="period-button" data-btc-period="7">7D</button>
+              <button class="period-button" data-btc-period="30">30D</button>
+              <button class="period-button" data-btc-period="90">90D</button>
+              <button class="period-button" data-btc-period="365">1Y</button>
+            </div>
+          </div>
+          <div class="chart-wrap large-chart">
+            <canvas id="marketBitcoinChart"></canvas>
+          </div>
+          <p class="small-note" id="marketChartNote">
+            Historical data availability depends on the public data provider.
+          </p>
         </article>
-    </div>
-</section>
 
-<!-- BITCOIN -->
-<section class="page" id="bitcoin">
-    <div class="page-heading"><div><div class="eyebrow">DIGITAL ASSET ARCHIVE</div><h1>Markets & Bitcoin</h1><div class="subheading">Cryptocurrency market data from CoinGecko.</div></div></div>
-    <div class="grid">
-        <article class="panel metric span-3"><div class="metric-label">BTC price</div><div class="metric-value" id="btcPagePrice">—</div></article>
-        <article class="panel metric span-3"><div class="metric-label">24-hour change</div><div class="metric-value" id="btcPageChange">—</div></article>
-        <article class="panel metric span-3"><div class="metric-label">Market cap</div><div class="metric-value" id="btcMarketCap">—</div></article>
-        <article class="panel metric span-3"><div class="metric-label">24-hour volume</div><div class="metric-value" id="btcVolume">—</div></article>
-        <article class="panel span-12">
-            <div class="panel-title"><h2>Bitcoin Price History</h2><select id="btcPagePeriod"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></div>
-            <div class="chart-box"><canvas id="btcPageChart"></canvas></div>
-            <p class="notice">Cryptocurrency markets operate continuously. API availability and rate limits may affect refreshes.</p>
-        </article>
-    </div>
-</section>
+        <div class="section-heading subsection-heading">
+          <div>
+            <div class="eyebrow">MARKET COVERAGE</div>
+            <h3>Data availability register</h3>
+          </div>
+        </div>
 
-<!-- ECONOMY -->
-<section class="page" id="economy">
-    <div class="page-heading"><div><div class="eyebrow">GLOBAL ECONOMIC RECORDS</div><h1>Economy</h1><div class="subheading">World Bank indicators and historical observations.</div></div></div>
-    <article class="panel">
-        <div class="toolbar">
-            <select id="economyCountry">
-                <option value="POL">Poland</option><option value="USA">United States</option>
-                <option value="GBR">United Kingdom</option><option value="DEU">Germany</option>
-                <option value="FRA">France</option><option value="CHE">Switzerland</option>
-                <option value="JPN">Japan</option><option value="CHN">China</option>
-                <option value="IND">India</option><option value="BRA">Brazil</option>
-                <option value="CAN">Canada</option><option value="AUS">Australia</option>
+        <div class="availability-grid">
+          <div class="availability-item">
+            <span class="availability-symbol">BTC</span>
+            <div><strong>Bitcoin</strong><small>Market price, volume and history</small></div>
+            <span class="status-available">AVAILABLE</span>
+          </div>
+          <div class="availability-item">
+            <span class="availability-symbol">XAU</span>
+            <div><strong>Gold</strong><small>Official NBP gold reference price</small></div>
+            <span class="status-available">AVAILABLE</span>
+          </div>
+          <div class="availability-item">
+            <span class="availability-symbol">IDX</span>
+            <div><strong>Stock indices</strong><small>Live index quotes are not supplied by these data sources</small></div>
+            <span class="status-unavailable">NOT CONNECTED</span>
+          </div>
+          <div class="availability-item">
+            <span class="availability-symbol">FX</span>
+            <div><strong>Foreign exchange</strong><small>Official NBP reference rates</small></div>
+            <span class="status-available">AVAILABLE</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ECONOMY -->
+      <section id="economy" class="section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">05 — MACROECONOMIC RECORDS</div>
+            <h2>Inflation & <em>Economy</em></h2>
+          </div>
+          <div class="section-note">WORLD BANK ANNUAL INDICATORS</div>
+        </div>
+
+        <div class="economy-controls">
+          <label>
+            <span>SELECT COUNTRY</span>
+            <select id="economyCountry" class="dark-select">
+              <option value="USA">United States</option>
+              <option value="POL">Poland</option>
+              <option value="GBR">United Kingdom</option>
+              <option value="DEU">Germany</option>
+              <option value="FRA">France</option>
+              <option value="JPN">Japan</option>
+              <option value="CHN">China</option>
+              <option value="IND">India</option>
+              <option value="BRA">Brazil</option>
+              <option value="CAN">Canada</option>
+              <option value="AUS">Australia</option>
+              <option value="CHE">Switzerland</option>
+              <option value="ITA">Italy</option>
+              <option value="ESP">Spain</option>
+              <option value="NLD">Netherlands</option>
+              <option value="SWE">Sweden</option>
+              <option value="NOR">Norway</option>
+              <option value="KOR">South Korea</option>
+              <option value="MEX">Mexico</option>
+              <option value="ZAF">South Africa</option>
             </select>
-            <select id="economyIndicator">
-                <option value="NY.GDP.MKTP.KD.ZG">GDP growth (%)</option>
-                <option value="FP.CPI.TOTL.ZG">Inflation (%)</option>
-                <option value="SL.UEM.TOTL.ZS">Unemployment (%)</option>
-                <option value="NY.GDP.PCAP.CD">GDP per capita (current US$)</option>
-                <option value="SP.POP.TOTL">Population</option>
+          </label>
+          <p id="economyCountryStatus">Select a country to load its latest available annual indicators.</p>
+        </div>
+
+        <div class="economy-grid">
+          <article class="metric-card">
+            <div class="metric-label">GDP GROWTH</div>
+            <div class="metric-value" id="economyGDP">—</div>
+            <div class="metric-foot" id="economyGDPYear">WORLD BANK</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-label">INFLATION</div>
+            <div class="metric-value" id="economyInflation">—</div>
+            <div class="metric-foot" id="economyInflationYear">WORLD BANK</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-label">UNEMPLOYMENT</div>
+            <div class="metric-value" id="economyUnemployment">—</div>
+            <div class="metric-foot" id="economyUnemploymentYear">WORLD BANK</div>
+          </article>
+        </div>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <div class="eyebrow">LONG-TERM INDICATORS</div>
+              <h3>Economic development record</h3>
+            </div>
+            <span class="source-tag">WORLD BANK</span>
+          </div>
+          <div class="chart-wrap large-chart">
+            <canvas id="economyChart"></canvas>
+          </div>
+          <p class="small-note">
+            Annual GDP growth, inflation and unemployment observations.
+            The chart is populated only with values returned by the World Bank.
+          </p>
+        </article>
+      </section>
+
+      <!-- CALCULATORS -->
+      <section id="calculators" class="section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">06 — FINANCIAL INSTRUMENTS</div>
+            <h2>Financial <em>Calculators</em></h2>
+          </div>
+          <div class="section-note">MATHEMATICAL ESTIMATES · NOT FINANCIAL ADVICE</div>
+        </div>
+
+        <div class="calculator-grid">
+          <article class="panel calculator">
+            <div class="eyebrow">01 / FOREIGN EXCHANGE</div>
+            <h3>Currency converter</h3>
+            <label>Amount
+              <input id="convertAmount" type="number" min="0" step="any" value="100">
+            </label>
+            <div class="two-fields">
+              <label>From
+                <select id="convertFrom" class="dark-select">
+                  <option>USD</option><option>EUR</option><option>GBP</option>
+                  <option>PLN</option><option>CHF</option><option>JPY</option>
+                  <option>CAD</option><option>AUD</option><option>CNY</option>
+                </select>
+              </label>
+              <label>To
+                <select id="convertTo" class="dark-select">
+                  <option>EUR</option><option>USD</option><option>GBP</option>
+                  <option>PLN</option><option>CHF</option><option>JPY</option>
+                  <option>CAD</option><option>AUD</option><option>CNY</option>
+                </select>
+              </label>
+            </div>
+            <button id="convertButton" class="gold-button">CALCULATE CONVERSION</button>
+            <div class="calculator-result" id="convertResult">—</div>
+            <small class="small-note">Uses the latest available NBP reference rates.</small>
+          </article>
+
+          <article class="panel calculator">
+            <div class="eyebrow">02 / COMPOUND INTEREST</div>
+            <h3>Compound interest</h3>
+            <label>Initial principal
+              <input id="compoundPrincipal" type="number" min="0" step="any" value="1000">
+            </label>
+            <div class="two-fields">
+              <label>Annual rate (%)
+                <input id="compoundRate" type="number" step="any" value="5">
+              </label>
+              <label>Years
+                <input id="compoundYears" type="number" min="0" step="any" value="10">
+              </label>
+            </div>
+            <label>Compounding frequency
+              <select id="compoundFrequency" class="dark-select">
+                <option value="1">Annually</option>
+                <option value="2">Semi-annually</option>
+                <option value="4">Quarterly</option>
+                <option value="12" selected>Monthly</option>
+                <option value="365">Daily</option>
+              </select>
+            </label>
+            <button id="compoundButton" class="gold-button">CALCULATE INTEREST</button>
+            <div class="calculator-result" id="compoundResult">—</div>
+          </article>
+
+          <article class="panel calculator">
+            <div class="eyebrow">03 / SIMPLE INTEREST</div>
+            <h3>Simple interest</h3>
+            <label>Principal
+              <input id="simplePrincipal" type="number" min="0" step="any" value="1000">
+            </label>
+            <div class="two-fields">
+              <label>Annual rate (%)
+                <input id="simpleRate" type="number" step="any" value="5">
+              </label>
+              <label>Years
+                <input id="simpleYears" type="number" min="0" step="any" value="5">
+              </label>
+            </div>
+            <button id="simpleButton" class="gold-button">CALCULATE INTEREST</button>
+            <div class="calculator-result" id="simpleResult">—</div>
+          </article>
+
+          <article class="panel calculator">
+            <div class="eyebrow">04 / INFLATION</div>
+            <h3>Inflation impact</h3>
+            <label>Current amount
+              <input id="inflationAmount" type="number" min="0" step="any" value="1000">
+            </label>
+            <div class="two-fields">
+              <label>Annual inflation (%)
+                <input id="inflationRate" type="number" step="any" value="3">
+              </label>
+              <label>Years
+                <input id="inflationYears" type="number" min="0" step="any" value="10">
+              </label>
+            </div>
+            <button id="inflationButton" class="gold-button">CALCULATE IMPACT</button>
+            <div class="calculator-result" id="inflationResult">—</div>
+          </article>
+        </div>
+      </section>
+
+      <!-- HISTORY -->
+      <section id="history" class="section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">07 — THE HISTORICAL REGISTER</div>
+            <h2>Historical <em>Archive</em></h2>
+          </div>
+          <div class="section-note">AVAILABLE PUBLIC HISTORICAL SERIES</div>
+        </div>
+
+        <div class="archive-controls">
+          <label>
+            <span>RECORD TYPE</span>
+            <select id="historyType" class="dark-select">
+              <option value="bitcoin">Bitcoin price</option>
+              <option value="gold">Gold price</option>
+              <option value="currency">Currency exchange rate</option>
             </select>
-            <button class="gold-button" id="loadEconomy">Load data</button>
+          </label>
+          <label>
+            <span>PERIOD</span>
+            <select id="historyPeriod" class="dark-select">
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="365" selected>Last year</option>
+            </select>
+          </label>
+          <label id="historyCurrencyWrap">
+            <span>CURRENCY</span>
+            <select id="historyCurrency" class="dark-select">
+              <option>USD</option><option>EUR</option><option>GBP</option>
+              <option>PLN</option><option>CHF</option><option>JPY</option>
+            </select>
+          </label>
+          <button id="loadHistory" class="outline-button">LOAD RECORDS</button>
         </div>
-        <div class="chart-box"><canvas id="economyChart"></canvas></div>
-        <div class="table-wrap" style="margin-top:20px">
-            <table><thead><tr><th>Year</th><th>Value</th><th>Indicator</th><th>Source</th></tr></thead><tbody id="economyTable"><tr><td colspan="4">Select an indicator.</td></tr></tbody></table>
-        </div>
-    </article>
-</section>
 
-<!-- GLOBE -->
-<section class="page" id="globe-page">
-    <div class="page-heading"><div><div class="eyebrow">GLOBAL FINANCIAL OBSERVATORY</div><h1>The World</h1><div class="subheading">Drag to rotate. Scroll to zoom. Select a country to inspect its data.</div></div></div>
-    <div class="globe-layout">
-        <article class="panel" style="padding:5px"><div id="globe"><div class="notice">Loading globe...</div></div></article>
-        <article class="panel country-panel">
-            <div class="eyebrow">COUNTRY PROFILE</div>
-            <h2 id="countryName" style="margin-top:10px">Select a country</h2>
-            <div class="notice" id="countryMessage">Choose a country on the globe to load its latest available economic indicators.</div>
-            <div id="countryStats"></div>
-        </article>
-    </div>
-</section>
-
-<!-- CALCULATORS -->
-<section class="page" id="calculators">
-    <div class="page-heading"><div><div class="eyebrow">FINANCIAL COMPUTATION TOOLS</div><h1>Calculators</h1></div></div>
-    <div class="grid">
-        <article class="panel span-6">
-            <h2>Compound Interest</h2>
-            <div class="form-grid" style="margin-top:18px">
-                <label class="field">Principal<input id="compoundPrincipal" type="number" min="0" value="1000"></label>
-                <label class="field">Annual rate (%)<input id="compoundRate" type="number" value="5" step="any"></label>
-                <label class="field">Years<input id="compoundYears" type="number" min="0" value="10"></label>
-                <label class="field">Compounds per year<select id="compoundFrequency"><option value="1">Yearly</option><option value="4">Quarterly</option><option value="12" selected>Monthly</option><option value="365">Daily</option></select></label>
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <div class="eyebrow">ARCHIVAL PRICE SERIES</div>
+              <h3 id="historyChartTitle">Bitcoin historical price</h3>
             </div>
-            <button class="gold-button" id="calculateCompound" style="margin-top:15px">Calculate</button>
-            <div class="result" id="compoundResult">Result will appear here.</div>
+            <span class="source-tag" id="historySource">COINGECKO</span>
+          </div>
+          <div class="chart-wrap large-chart">
+            <canvas id="historyChart"></canvas>
+          </div>
         </article>
 
-        <article class="panel span-6">
-            <h2>Simple Interest</h2>
-            <div class="form-grid" style="margin-top:18px">
-                <label class="field">Principal<input id="simplePrincipal" type="number" min="0" value="1000"></label>
-                <label class="field">Annual rate (%)<input id="simpleRate" type="number" value="5" step="any"></label>
-                <label class="field">Years<input id="simpleYears" type="number" min="0" value="5"></label>
-            </div>
-            <button class="gold-button" id="calculateSimple" style="margin-top:15px">Calculate</button>
-            <div class="result" id="simpleResult">Result will appear here.</div>
-        </article>
-
-        <article class="panel span-6">
-            <h2>Inflation Calculator</h2>
-            <div class="form-grid" style="margin-top:18px">
-                <label class="field">Original amount<input id="inflationAmount" type="number" min="0" value="1000"></label>
-                <label class="field">Annual inflation (%)<input id="inflationRate" type="number" value="4" step="any"></label>
-                <label class="field">Years<input id="inflationYears" type="number" min="0" value="10"></label>
-            </div>
-            <button class="gold-button" id="calculateInflation" style="margin-top:15px">Calculate</button>
-            <div class="result" id="inflationResult">Result will appear here.</div>
-        </article>
-
-        <article class="panel span-6">
-            <h2>Future Value</h2>
-            <div class="form-grid" style="margin-top:18px">
-                <label class="field">Present value<input id="futureAmount" type="number" min="0" value="1000"></label>
-                <label class="field">Annual growth (%)<input id="futureRate" type="number" value="5" step="any"></label>
-                <label class="field">Years<input id="futureYears" type="number" min="0" value="10"></label>
-            </div>
-            <button class="gold-button" id="calculateFuture" style="margin-top:15px">Calculate</button>
-            <div class="result" id="futureResult">Result will appear here.</div>
-        </article>
-    </div>
-</section>
-
-<!-- HISTORY -->
-<section class="page" id="history">
-    <div class="page-heading"><div><div class="eyebrow">THE HISTORICAL COLLECTION</div><h1>Historical Archive</h1></div></div>
-    <article class="panel">
-        <div class="toolbar">
-            <select id="historyType"><option value="gold">Gold price</option><option value="bitcoin">Bitcoin price</option></select>
-            <select id="historyPeriod"><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option></select>
-            <button class="gold-button" id="loadHistory">Load history</button>
-            <button class="outline-button" id="exportHistory">Export CSV</button>
+        <div class="table-wrap history-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>DATE</th>
+                <th>VALUE</th>
+                <th>UNIT</th>
+                <th>DATA PROVIDER</th>
+              </tr>
+            </thead>
+            <tbody id="historyRows">
+              <tr><td colspan="4" class="loading-cell">Choose a record type and load historical data.</td></tr>
+            </tbody>
+          </table>
         </div>
-        <div class="chart-box"><canvas id="historyChart"></canvas></div>
-        <div class="table-wrap" style="margin-top:20px">
-            <table><thead><tr><th>Date</th><th>Value</th><th>Currency</th><th>Source</th></tr></thead><tbody id="historyTable"><tr><td colspan="4">Choose a dataset.</td></tr></tbody></table>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <div class="footer-brand">
+        <span class="brand-mark">M</span>
+        <div>
+          <strong>THE MONETARY ARCHIVE</strong>
+          <small>AN INTERNATIONAL FINANCIAL OBSERVATORY</small>
         </div>
-    </article>
-</section>
-
-<!-- SETTINGS -->
-<section class="page" id="settings">
-    <div class="page-heading"><div><div class="eyebrow">ARCHIVE CONFIGURATION</div><h1>Settings</h1></div></div>
-    <article class="panel">
-        <h2>Display Preferences</h2>
-        <div class="form-grid" style="margin-top:20px">
-            <label class="field">Default currency<select id="settingsCurrency"><option>USD</option><option>EUR</option><option>GBP</option><option>CHF</option><option>PLN</option><option>JPY</option><option>CAD</option><option>AUD</option></select></label>
-            <label class="field">Refresh interval<select id="refreshInterval"><option value="60000">1 minute</option><option value="300000" selected>5 minutes</option><option value="900000">15 minutes</option></select></label>
-        </div>
-        <div style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
-            <button class="gold-button" id="saveSettings">Save settings</button>
-            <button class="outline-button" id="clearCache">Clear cached data</button>
-        </div>
-        <p class="notice">Settings are stored in this browser only.</p>
-    </article>
-    <article class="panel" style="margin-top:15px">
-        <h2>Data Sources</h2>
-        <div class="rate-row"><span>National Bank of Poland</span><span>Currency and gold records</span></div>
-        <div class="rate-row"><span>CoinGecko</span><span>Bitcoin market data</span></div>
-        <div class="rate-row"><span>World Bank</span><span>International economic indicators</span></div>
-        <p class="notice">Each source has its own update schedule and availability limits. No paid API key is required for the endpoints used here.</p>
-    </article>
-</section>
-
-<footer class="footer">
-    <span>THE MONETARY ARCHIVE · INTERNATIONAL FINANCIAL RECORDS</span>
-    <span id="lastUpdated">Last update: not yet available</span>
-</footer>
-
-</main>
-</div>
-
-<div class="status" id="status" role="status" aria-live="polite"></div>
-
-<script>
-"use strict";
-
-/* =====================================================
-   THE MONETARY ARCHIVE — APPLICATION
-===================================================== */
-
-const API = {
-    nbpRates: "https://api.nbp.pl/api/exchangerates/tables/A/?format=json",
-    nbpRatesB: "https://api.nbp.pl/api/exchangerates/tables/B/?format=json",
-    nbpGold: "https://api.nbp.pl/api/cenyzlota/?format=json",
-    coin: "https://api.coingecko.com/api/v3",
-    worldBank: "https://api.worldbank.org/v2"
-};
-
-const state = {
-    rates: {},
-    rateNames: {},
-    rateDate: null,
-    gold: null,
-    goldHistory: [],
-    bitcoin: null,
-    bitcoinHistory: [],
-    economy: {},
-    charts: {},
-    selectedCurrency: "USD",
-    historyRows: [],
-    globe: null
-};
-
-const countryCodes = {
-    Poland: "POL",
-    "United States of America": "USA",
-    "United States": "USA",
-    "United Kingdom": "GBR",
-    Germany: "DEU",
-    France: "FRA",
-    Switzerland: "CHE",
-    Japan: "JPN",
-    China: "CHN",
-    India: "IND",
-    Brazil: "BRA",
-    Canada: "CAN",
-    Australia: "AUS",
-    Italy: "ITA",
-    Spain: "ESP",
-    Netherlands: "NLD",
-    Sweden: "SWE",
-    Norway: "NOR",
-    Denmark: "DNK",
-    Portugal: "PRT",
-    Ukraine: "UKR",
-    Mexico: "MEX",
-    Argentina: "ARG",
-    "South Korea": "KOR",
-    "Russian Federation": "RUS",
-    Russia: "RUS",
-    Turkey: "TUR",
-    "South Africa": "ZAF",
-    Egypt: "EGY",
-    "New Zealand": "NZL",
-    Ireland: "IRL",
-    Belgium: "BEL",
-    Austria: "AUT",
-    Greece: "GRC",
-    Finland: "FIN",
-    Iceland: "ISL",
-    Singapore: "SGP",
-    Thailand: "THA",
-    Indonesia: "IDN",
-    Malaysia: "MYS",
-    Chile: "CHL",
-    Colombia: "COL",
-    Peru: "PER",
-    Nigeria: "NGA",
-    Kenya: "KEN",
-    Morocco: "MAR",
-    Pakistan: "PAK",
-    Bangladesh: "BGD",
-    Vietnam: "VNM"
-};
-
-const countryNames = {
-    POL: "Poland", USA: "United States", GBR: "United Kingdom",
-    DEU: "Germany", FRA: "France", CHE: "Switzerland",
-    JPN: "Japan", CHN: "China", IND: "India",
-    BRA: "Brazil", CAN: "Canada", AUS: "Australia"
-};
-
-const currencyNames = {
-    USD: "US Dollar", EUR: "Euro", GBP: "Pound Sterling",
-    CHF: "Swiss Franc", PLN: "Polish Zloty", JPY: "Japanese Yen",
-    CAD: "Canadian Dollar", AUD: "Australian Dollar",
-    CNY: "Chinese Yuan", INR: "Indian Rupee",
-    SEK: "Swedish Krona", NOK: "Norwegian Krone",
-    DKK: "Danish Krone", CZK: "Czech Koruna",
-    HUF: "Hungarian Forint", BRL: "Brazilian Real"
-};
-
-const $ = id => document.getElementById(id);
-
-function notify(message) {
-    const box = $("status");
-    box.textContent = message;
-    box.classList.add("show");
-    clearTimeout(notify.timer);
-    notify.timer = setTimeout(() => box.classList.remove("show"), 4200);
-}
-
-function safeNumber(value) {
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-}
-
-function formatMoney(value, currency = state.selectedCurrency) {
-    if (!Number.isFinite(value)) return "Unavailable";
-    try {
-        return new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency,
-            maximumFractionDigits: currency === "JPY" ? 0 : 2
-        }).format(value);
-    } catch {
-        return value.toLocaleString("en-US", { maximumFractionDigits: 2 }) + " " + currency;
-    }
-}
-
-function formatCompact(value) {
-    if (!Number.isFinite(value)) return "Unavailable";
-    return new Intl.NumberFormat("en-US", {
-        notation: "compact",
-        maximumFractionDigits: 2
-    }).format(value);
-}
-
-function setText(id, value) {
-    const element = $(id);
-    if (element) element.textContent = value;
-}
-
-async function fetchJSON(url, timeout = 15000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
-
-    try {
-        const response = await fetch(url, {
-            signal: controller.signal,
-            headers: { "Accept": "application/json" }
-        });
-
-        if (!response.ok) {
-            throw new Error("HTTP " + response.status);
-        }
-
-        return await response.json();
-    } finally {
-        clearTimeout(timer);
-    }
-}
-
-function saveCache(key, data) {
-    try {
-        localStorage.setItem("monetary_archive_" + key, JSON.stringify({
-            savedAt: Date.now(),
-            data
-        }));
-    } catch {}
-}
-
-function readCache(key, maxAge = 86400000) {
-    try {
-        const raw = localStorage.getItem("monetary_archive_" + key);
-        if (!raw) return null;
-        const item = JSON.parse(raw);
-        if (!item.savedAt || Date.now() - item.savedAt > maxAge) return null;
-        return item.data;
-    } catch {
-        return null;
-    }
-}
-
-/* =====================================================
-   NAVIGATION
-===================================================== */
-
-function showPage(pageId) {
-    document.querySelectorAll(".page").forEach(page => {
-        page.classList.toggle("active", page.id === pageId);
-    });
-
-    document.querySelectorAll(".nav-button").forEach(button => {
-        button.classList.toggle("active", button.dataset.page === pageId);
-    });
-
-    if (pageId === "globe-page") {
-        setTimeout(() => {
-            if (state.globe) {
-                const width = $("globe").clientWidth;
-                state.globe.width(width);
-            }
-        }, 100);
-    }
-
-    if (pageId === "economy" && !$("economyTable").dataset.loaded) {
-        loadEconomy();
-    }
-}
-
-document.querySelectorAll(".nav-button").forEach(button => {
-    button.addEventListener("click", () => showPage(button.dataset.page));
-});
-
-document.querySelectorAll("[data-go]").forEach(button => {
-    button.addEventListener("click", () => showPage(button.dataset.go));
-});
-
-/* =====================================================
-   CURRENCY DATA
-===================================================== */
-
-async function loadRates() {
-    try {
-        const [tableA, tableB] = await Promise.all([
-            fetchJSON(API.nbpRates),
-            fetchJSON(API.nbpRatesB)
-        ]);
-
-        const rates = { PLN: 1 };
-        const names = { PLN: currencyNames.PLN };
-
-        for (const table of [...tableA, ...tableB]) {
-            for (const item of table.rates || []) {
-                rates[item.code] = Number(item.mid);
-                names[item.code] = item.currency;
-            }
-        }
-
-        state.rates = rates;
-        state.rateNames = names;
-        state.rateDate = tableA[0]?.effectiveDate || null;
-
-        saveCache("rates", {
-            rates,
-            names,
-            date: state.rateDate
-        });
-
-        renderRates();
-        setText("connection", "Connected");
-        return true;
-    } catch (error) {
-        const cached = readCache("rates", 7 * 86400000);
-
-        if (cached) {
-            state.rates = cached.rates;
-            state.rateNames = cached.names;
-            state.rateDate = cached.date;
-            renderRates();
-            setText("connection", "Cached data");
-            notify("NBP unavailable. Showing cached exchange rates.");
-        } else {
-            setText("connection", "Data unavailable");
-            $("dashboardRates").textContent = "Exchange rates are currently unavailable.";
-            $("currencyTable").innerHTML = '<tr><td colspan="5">Exchange rates unavailable. Please try again later.</td></tr>';
-        }
-
-        console.error("Rates error:", error);
-        return false;
-    }
-}
-
-function convertFromPLN(amount, currency) {
-    const rate = state.rates[currency];
-    if (!Number.isFinite(rate) || rate <= 0) return null;
-    return amount / rate;
-}
-
-function convertCurrency(amount, from, to) {
-    if (!Number.isFinite(amount) || amount < 0) return null;
-    const fromRate = state.rates[from];
-    const toRate = state.rates[to];
-
-    if (!Number.isFinite(fromRate) || !Number.isFinite(toRate) || toRate <= 0) {
-        return null;
-    }
-
-    return amount * fromRate / toRate;
-}
-
-function renderRates() {
-    const entries = Object.entries(state.rates)
-        .filter(([code, value]) => Number.isFinite(value) && value > 0)
-        .sort((a,b) => a[0].localeCompare(b[0]));
-
-    setText("ratesDate", state.rateDate ? "NBP · " + state.rateDate : "NBP");
-    setText("lastUpdated", "Latest NBP table: " + (state.rateDate || "unknown"));
-
-    const preferred = ["USD","EUR","GBP","CHF","JPY","CAD","AUD"];
-    $("dashboardRates").innerHTML = preferred.map(code => {
-        const rate = state.rates[code];
-        if (!rate) return "";
-        const converted = convertCurrency(1, code, state.selectedCurrency);
-        return `
-            <div class="rate-row">
-                <div><span class="rate-code">${code}</span><br><span class="rate-name">${currencyNames[code] || code}</span></div>
-                <span class="rate-value">${formatMoney(converted, state.selectedCurrency)}</span>
-                <span class="rate-name">1 ${code}</span>
-            </div>`;
-    }).join("");
-
-    const query = ($("currencySearch").value || "").toLowerCase();
-    const sort = $("currencySort").value;
-
-    let filtered = entries.filter(([code]) => {
-        const name = (state.rateNames[code] || currencyNames[code] || "").toLowerCase();
-        return code.toLowerCase().includes(query) || name.includes(query);
-    });
-
-    if (sort === "name") filtered.sort((a,b) => (state.rateNames[a[0]] || a[0]).localeCompare(state.rateNames[b[0]] || b[0]));
-    if (sort === "rate") filtered.sort((a,b) => a[1] - b[1]);
-
-    $("currencyTable").innerHTML = filtered.map(([code, plnRate]) => {
-        const converted = convertCurrency(1, code, state.selectedCurrency);
-        return `<tr>
-            <td>${state.rateNames[code] || currencyNames[code] || code}</td>
-            <td><strong>${code}</strong></td>
-            <td>${plnRate.toFixed(5)} PLN</td>
-            <td>${converted === null ? "Unavailable" : formatMoney(converted, state.selectedCurrency)}</td>
-            <td>NBP</td>
-        </tr>`;
-    }).join("") || '<tr><td colspan="5">No matching currencies.</td></tr>';
-}
-
-$("currencySearch").addEventListener("input", renderRates);
-$("currencySort").addEventListener("change", renderRates);
-$("refreshRates").addEventListener("click", async () => {
-    notify("Refreshing exchange rates...");
-    await loadRates();
-    notify("Exchange rate request completed.");
-});
-
-/* =====================================================
-   DISPLAY CURRENCY
-===================================================== */
-
-function changeDisplayCurrency(currency) {
-    state.selectedCurrency = currency;
-    $("displayCurrency").value = currency;
-    $("settingsCurrency").value = currency;
-
-    renderRates();
-    renderGold();
-    renderBitcoin();
-    calculateConversion();
-}
-
-$("displayCurrency").addEventListener("change", event => {
-    changeDisplayCurrency(event.target.value);
-});
-
-$("settingsCurrency").addEventListener("change", event => {
-    changeDisplayCurrency(event.target.value);
-});
-
-/* =====================================================
-   GOLD DATA
-===================================================== */
-
-async function loadGold() {
-    try {
-        const data = await fetchJSON(API.nbpGold);
-        if (!Array.isArray(data) || !data.length) throw new Error("Empty gold response");
-
-        state.gold = {
-            price: Number(data[data.length - 1].cena),
-            date: data[data.length - 1].data
-        };
-
-        saveCache("gold", state.gold);
-        renderGold();
-    } catch (error) {
-        const cached = readCache("gold", 7 * 86400000);
-        if (cached) {
-            state.gold = cached;
-            renderGold();
-            setText("goldDate", "Cached observation · " + cached.date);
-        } else {
-            setText("goldValue", "Unavailable");
-            setText("goldPageGram", "Unavailable");
-        }
-        console.error("Gold error:", error);
-    }
-}
-
-async function loadGoldHistory() {
-    const days = Number($("goldDays").value);
-    const start = new Date();
-    start.setDate(start.getDate() - days);
-    const from = start.toISOString().slice(0,10);
-    const to = new Date().toISOString().slice(0,10);
-
-    try {
-        const data = await fetchJSON(
-            `https://api.nbp.pl/api/cenyzlota/${from}/${to}/?format=json`
-        );
-        state.goldHistory = data.map(item => ({
-            date: item.data,
-            value: Number(item.cena)
-        }));
-        renderGoldChart();
-    } catch (error) {
-        console.error("Gold history error:", error);
-        notify("Gold history is currently unavailable.");
-    }
-}
-
-function renderGold() {
-    if (!state.gold) return;
-
-    const plnPrice = state.gold.price;
-    const gram = convertCurrency(plnPrice, "PLN", state.selectedCurrency);
-    const ounce = convertCurrency(plnPrice * 31.1034768, "PLN", state.selectedCurrency);
-
-    setText("goldValue", formatMoney(gram, state.selectedCurrency));
-    setText("goldDate", "NBP observation · " + state.gold.date);
-    setText("goldPageGram", formatMoney(gram, state.selectedCurrency));
-    setText("goldPageOunce", formatMoney(ounce, state.selectedCurrency));
-    setText("goldPageDate", "Observation · " + state.gold.date);
-}
-
-$("goldDays").addEventListener("change", loadGoldHistory);
-
-/* =====================================================
-   BITCOIN
-===================================================== */
-
-async function loadBitcoin() {
-    const currency = state.selectedCurrency.toLowerCase();
-
-    try {
-        const data = await fetchJSON(
-            `${API.coin}/simple/price?ids=bitcoin&vs_currencies=${currency}&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`
-        );
-
-        const coin = data.bitcoin;
-        if (!coin || !Number.isFinite(coin[currency])) {
-            throw new Error("Bitcoin data missing");
-        }
-
-        state.bitcoin = {
-            price: coin[currency],
-            change: coin[currency + "_24h_change"],
-            marketCap: coin[currency + "_market_cap"],
-            volume: coin[currency + "_24h_vol"],
-            currency: state.selectedCurrency
-        };
-
-        saveCache("bitcoin_" + currency, state.bitcoin);
-        renderBitcoin();
-        await loadBitcoinHistory(30);
-    } catch (error) {
-        const cached = readCache("bitcoin_" + currency, 86400000);
-
-        if (cached) {
-            state.bitcoin = cached;
-            renderBitcoin();
-            notify("CoinGecko unavailable. Showing cached Bitcoin data.");
-        } else {
-            setText("btcValue", "Unavailable");
-            setText("btcPagePrice", "Unavailable");
-        }
-
-        console.error("Bitcoin error:", error);
-    }
-}
-
-async function loadBitcoinHistory(days) {
-    const currency = state.selectedCurrency.toLowerCase();
-
-    try {
-        const data = await fetchJSON(
-            `${API.coin}/coins/bitcoin/market_chart?vs_currency=${currency}&days=${days}`
-        );
-
-        state.bitcoinHistory = (data.prices || []).map(point => ({
-            date: new Date(point[0]).toLocaleDateString(),
-            value: Number(point[1])
-        }));
-
-        renderBitcoinChart();
-    } catch (error) {
-        console.error("Bitcoin history error:", error);
-        notify("Bitcoin historical chart could not be updated.");
-    }
-}
-
-function renderBitcoin() {
-    if (!state.bitcoin) return;
-
-    const b = state.bitcoin;
-    const price = formatMoney(b.price, b.currency);
-    const change = Number.isFinite(b.change) ? b.change.toFixed(2) + "%" : "Unavailable";
-
-    setText("btcValue", price);
-    setText("btcPagePrice", price);
-    setText("btcChange", change + " · 24h");
-    setText("btcPageChange", change);
-    setText("btcMarketCap", formatMoney(b.marketCap, b.currency));
-    setText("btcVolume", formatMoney(b.volume, b.currency));
-
-    $("btcChange").className = "metric-foot " + (b.change >= 0 ? "positive" : "negative");
-    $("btcPageChange").className = "metric-value " + (b.change >= 0 ? "positive" : "negative");
-}
-
-$("btcPeriod").addEventListener("change", event => loadBitcoinHistory(Number(event.target.value)));
-$("btcPagePeriod").addEventListener("change", event => loadBitcoinHistory(Number(event.target.value)));
-
-/* =====================================================
-   CHARTS
-===================================================== */
-
-function makeChart(id, labels, values, label, currency = "") {
-    const canvas = $(id);
-    if (!canvas) return;
-
-    if (state.charts[id]) state.charts[id].destroy();
-
-    state.charts[id] = new Chart(canvas, {
-        type: "line",
-        data: {
-            labels,
-            datasets: [{
-                label,
-                data: values,
-                borderColor: "#b89a60",
-                backgroundColor: "rgba(184,154,96,.12)",
-                borderWidth: 2,
-                fill: true,
-                tension: .28,
-                pointRadius: 0,
-                pointHoverRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { intersect: false, mode: "index" },
-            plugins: {
-                legend: { labels: { color: "#bdb5a7", boxWidth: 10 } },
-                tooltip: {
-                    callbacks: {
-                        label: context => {
-                            const value = context.parsed.y;
-                            return label + ": " +
-                                (currency ? formatMoney(value, currency) :
-                                Number(value).toLocaleString("en-US", { maximumFractionDigits: 3 }));
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    ticks: { color: "#898782", maxTicksLimit: 8 },
-                    grid: { color: "rgba(184,154,96,.08)" }
-                },
-                y: {
-                    ticks: { color: "#898782" },
-                    grid: { color: "rgba(184,154,96,.08)" }
-                }
-            }
-        }
-    });
-}
-
-function renderBitcoinChart() {
-    if (!state.bitcoinHistory.length) return;
-    const labels = state.bitcoinHistory.map(x => x.date);
-    const values = state.bitcoinHistory.map(x => x.value);
-
-    makeChart("btcChart", labels, values, "Bitcoin", state.selectedCurrency);
-    makeChart("btcPageChart", labels, values, "Bitcoin", state.selectedCurrency);
-}
-
-function renderGoldChart() {
-    if (!state.goldHistory.length) return;
-
-    const labels = state.goldHistory.map(x => x.date);
-    const values = state.goldHistory.map(x =>
-        convertCurrency(x.value, "PLN", state.selectedCurrency)
-    );
-
-    makeChart("goldChart", labels, values, "Gold per gram", state.selectedCurrency);
-}
-
-/* =====================================================
-   WORLD BANK ECONOMIC DATA
-===================================================== */
-
-const worldIndicators = {
-    inflation: "FP.CPI.TOTL.ZG",
-    gdp: "NY.GDP.MKTP.KD.ZG",
-    unemployment: "SL.UEM.TOTL.ZS",
-    gdpPerCapita: "NY.GDP.PCAP.CD",
-    population: "SP.POP.TOTL"
-};
-
-async function loadWorldBank(country, indicator, years = 15) {
-    const url = `${API.worldBank}/country/${country}/indicator/${indicator}?format=json&per_page=${years}`;
-    const response = await fetchJSON(url);
-
-    if (!Array.isArray(response) || !Array.isArray(response[1])) {
-        throw new Error("World Bank returned no observations");
-    }
-
-    return response[1]
-        .filter(item => item.value !== null)
-        .map(item => ({
-            year: item.date,
-            value: Number(item.value),
-            country: item.country?.value || country
-        }))
-        .sort((a,b) => Number(a.year) - Number(b.year));
-}
-
-async function loadDashboardEconomy() {
-    const items = [
-        ["Inflation", "FP.CPI.TOTL.ZG"],
-        ["GDP growth", "NY.GDP.MKTP.KD.ZG"],
-        ["Unemployment", "SL.UEM.TOTL.ZS"]
-    ];
-
-    const results = await Promise.allSettled(
-        items.map(item => loadWorldBank("POL", item[1], 10))
-    );
-
-    let rows = [];
-
-    results.forEach((result, index) => {
-        if (result.status !== "fulfilled" || !result.value.length) return;
-
-        const latest = result.value[result.value.length - 1];
-        const value = latest.value.toFixed(2) + "%";
-
-        rows.push(`<tr>
-            <td>${items[index][0]}</td>
-            <td>${value}</td>
-            <td>Poland</td>
-            <td>${latest.year}</td>
-            <td>World Bank</td>
-        </tr>`);
-
-        if (items[index][0] === "Inflation") {
-            setText("inflationValue", value);
-            setText("inflationYear", "Observation year " + latest.year);
-        }
-
-        if (items[index][0] === "GDP growth") {
-            setText("gdpValue", value);
-            setText("gdpYear", "Observation year " + latest.year);
-        }
-    });
-
-    $("overviewEconomy").innerHTML = rows.length
-        ? rows.join("")
-        : '<tr><td colspan="5">Economic indicators unavailable.</td></tr>';
-}
-
-async function loadEconomy() {
-    const country = $("economyCountry").value;
-    const indicator = $("economyIndicator").value;
-
-    $("economyTable").innerHTML = '<tr><td colspan="4">Loading World Bank observations...</td></tr>';
-
-    try {
-        const data = await loadWorldBank(country, indicator, 20);
-
-        if (!data.length) throw new Error("No observations");
-
-        $("economyTable").innerHTML = data.map(item => `
-            <tr>
-                <td>${item.year}</td>
-                <td>${item.value.toLocaleString("en-US", { maximumFractionDigits: 3 })}</td>
-                <td>${indicator}</td>
-                <td>World Bank</td>
-            </tr>`).join("");
-
-        $("economyTable").dataset.loaded = "true";
-
-        makeChart(
-            "economyChart",
-            data.map(x => x.year),
-            data.map(x => x.value),
-            indicator
-        );
-    } catch (error) {
-        $("economyTable").innerHTML = '<tr><td colspan="4">World Bank data is currently unavailable.</td></tr>';
-        notify("Could not retrieve economic data.");
-        console.error(error);
-    }
-}
-
-$("loadEconomy").addEventListener("click", loadEconomy);
-$("economyCountry").addEventListener("change", loadEconomy);
-$("economyIndicator").addEventListener("change", loadEconomy);
-
-/* =====================================================
-   CURRENCY CONVERTER
-===================================================== */
-
-function calculateConversion() {
-    const amount = safeNumber($("convertAmount").value);
-    const from = $("convertFrom").value;
-    const to = $("convertTo").value;
-
-    const result = convertCurrency(amount, from, to);
-
-    if (result === null) {
-        setText("convertResult", "Rate unavailable");
-        setText("convertRate", "Wait for exchange-rate data to load.");
-        return;
-    }
-
-    setText("convertResult", formatMoney(result, to));
-
-    const oneUnit = convertCurrency(1, from, to);
-    setText("convertRate", `1 ${from} = ${oneUnit.toFixed(6)} ${to}`);
-}
-
-$("convertButton").addEventListener("click", calculateConversion);
-$("convertAmount").addEventListener("input", calculateConversion);
-$("convertFrom").addEventListener("change", calculateConversion);
-$("convertTo").addEventListener("change", calculateConversion);
-
-/* =====================================================
-   CALCULATORS
-===================================================== */
-
-function getInputs(ids) {
-    const values = ids.map(id => safeNumber($(id).value));
-    if (values.some(value => value === null || value < 0)) {
-        throw new Error("Enter valid non-negative numbers.");
-    }
-    return values;
-}
-
-function calculateCompound() {
-    try {
-        const [principal, rate, years] = getInputs([
-            "compoundPrincipal","compoundRate","compoundYears"
-        ]);
-        const frequency = Number($("compoundFrequency").value);
-        const total = principal * Math.pow(1 + rate / 100 / frequency, frequency * years);
-        $("compoundResult").textContent = formatMoney(total, state.selectedCurrency);
-    } catch (error) { notify(error.message); }
-}
-
-function calculateSimple() {
-    try {
-        const [principal, rate, years] = getInputs([
-            "simplePrincipal","simpleRate","simpleYears"
-        ]);
-        const interest = principal * rate / 100 * years;
-        $("simpleResult").textContent = "Total: " +
-            formatMoney(principal + interest, state.selectedCurrency) +
-            " · Interest: " + formatMoney(interest, state.selectedCurrency);
-    } catch (error) { notify(error.message); }
-}
-
-function calculateInflation() {
-    try {
-        const [amount, rate, years] = getInputs([
-            "inflationAmount","inflationRate","inflationYears"
-        ]);
-        const futureCost = amount * Math.pow(1 + rate / 100, years);
-        $("inflationResult").textContent =
-            "Equivalent future cost: " + formatMoney(futureCost, state.selectedCurrency) +
-            " · Purchasing power of the original amount: " +
-            formatMoney(amount / Math.pow(1 + rate / 100, years), state.selectedCurrency);
-    } catch (error) { notify(error.message); }
-}
-
-function calculateFuture() {
-    try {
-        const [amount, rate, years] = getInputs([
-            "futureAmount","futureRate","futureYears"
-        ]);
-        const total = amount * Math.pow(1 + rate / 100, years);
-        $("futureResult").textContent = formatMoney(total, state.selectedCurrency);
-    } catch (error) { notify(error.message); }
-}
-
-$("calculateCompound").addEventListener("click", calculateCompound);
-$("calculateSimple").addEventListener("click", calculateSimple);
-$("calculateInflation").addEventListener("click", calculateInflation);
-$("calculateFuture").addEventListener("click", calculateFuture);
-
-/* =====================================================
-   HISTORICAL ARCHIVE
-===================================================== */
-
-async function loadHistory() {
-    const type = $("historyType").value;
-    const days = Number($("historyPeriod").value);
-
-    if (type === "gold") {
-        await loadGoldHistory();
-        state.historyRows = state.goldHistory.map(item => ({
-            date: item.date,
-            value: convertCurrency(item.value, "PLN", state.selectedCurrency),
-            currency: state.selectedCurrency,
-            source: "NBP"
-        }));
-        makeChart(
-            "historyChart",
-            state.historyRows.map(x => x.date),
-            state.historyRows.map(x => x.value),
-            "Gold",
-            state.selectedCurrency
-        );
-    } else {
-        await loadBitcoinHistory(days);
-        state.historyRows = state.bitcoinHistory.map(item => ({
-            date: item.date,
-            value: item.value,
-            currency: state.selectedCurrency,
-            source: "CoinGecko"
-        }));
-        makeChart(
-            "historyChart",
-            state.historyRows.map(x => x.date),
-            state.historyRows.map(x => x.value),
-            "Bitcoin",
-            state.selectedCurrency
-        );
-    }
-
-    $("historyTable").innerHTML = state.historyRows.map(row => `
-        <tr><td>${row.date}</td><td>${formatMoney(row.value,row.currency)}</td><td>${row.currency}</td><td>${row.source}</td></tr>
-    `).join("") || '<tr><td colspan="4">No historical data available.</td></tr>';
-}
-
-$("loadHistory").addEventListener("click", loadHistory);
-
-$("exportHistory").addEventListener("click", () => {
-    if (!state.historyRows.length) {
-        notify("Load historical data before exporting.");
-        return;
-    }
-
-    const rows = [
-        ["Date","Value","Currency","Source"],
-        ...state.historyRows.map(row => [row.date,row.value,row.currency,row.source])
-    ];
-
-    const csv = rows.map(row =>
-        row.map(value => `"${String(value).replace(/"/g,'""')}"`).join(",")
-    ).join("\n");
-
-    downloadCSV(csv, "monetary-archive-history.csv");
-});
-
-/* =====================================================
-   CSV EXPORT
-===================================================== */
-
-function downloadCSV(content, filename) {
-    const blob = new Blob(["\uFEFF" + content], {
-        type: "text/csv;charset=utf-8"
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-}
-
-/* =====================================================
-   3D GLOBE
-===================================================== */
-
-async function initGlobe() {
-    const container = $("globe");
-
-    if (typeof Globe !== "function" || typeof topojson === "undefined") {
-        container.innerHTML = '<div class="notice">The 3D globe library could not be loaded. Check your internet connection.</div>';
-        return;
-    }
-
-    try {
-        const world = await fetchJSON(
-            "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
-        );
-
-        const features = topojson.feature(
-            world,
-            world.objects.countries
-        ).features;
-
-        state.globe = Globe()(container)
-            .backgroundColor("#090b10")
-            .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
-            .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-            .showAtmosphere(true)
-            .atmosphereColor("#9a7b48")
-            .atmosphereAltitude(0.16)
-            .polygonsData(features)
-            .polygonCapColor(() => "rgba(184,154,96,0.12)")
-            .polygonSideColor(() => "rgba(80,67,44,0.18)")
-            .polygonStrokeColor(() => "rgba(202,177,128,0.55)")
-            .polygonAltitude(0.008)
-            .polygonLabel(feature => feature.properties.name || "Country")
-            .onPolygonClick(feature => {
-                selectGlobeCountry(feature.properties.name || "Unknown country");
-            })
-            .onPolygonHover(feature => {
-                container.style.cursor = feature ? "pointer" : "grab";
-            });
-
-        state.globe.controls().autoRotate = true;
-        state.globe.controls().autoRotateSpeed = 0.35;
-        state.globe.controls().enableDamping = true;
-
-        state.globe.width(container.clientWidth);
-        state.globe.height(container.clientHeight);
-
-        window.addEventListener("resize", () => {
-            if (state.globe && container.clientWidth) {
-                state.globe.width(container.clientWidth);
-                state.globe.height(container.clientHeight);
-            }
-        });
-
-    } catch (error) {
-        container.innerHTML = '<div class="notice">Could not load geographic data. Please check your connection and reload the page.</div>';
-        console.error("Globe error:", error);
-    }
-}
-
-async function selectGlobeCountry(name) {
-    setText("countryName", name);
-    setText("countryMessage", "Loading available World Bank observations...");
-
-    $("countryStats").innerHTML = "";
-
-    const iso3 = countryCodes[name];
-
-    if (!iso3) {
-        setText("countryMessage", "A country-code match is not available for this territory yet. No economic figures will be invented.");
-        return;
-    }
-
-    const indicators = [
-        ["GDP growth", "NY.GDP.MKTP.KD.ZG"],
-        ["Inflation", "FP.CPI.TOTL.ZG"],
-        ["Unemployment", "SL.UEM.TOTL.ZS"],
-        ["GDP per capita", "NY.GDP.PCAP.CD"]
-    ];
-
-    const results = await Promise.allSettled(
-        indicators.map(item => loadWorldBank(iso3, item[1], 10))
-    );
-
-    let html = "";
-    let available = 0;
-
-    results.forEach((result,index) => {
-        if (result.status !== "fulfilled" || !result.value.length) {
-            html += `<div class="country-row"><span>${indicators[index][0]}</span><strong>Unavailable</strong></div>`;
-            return;
-        }
-
-        const latest = result.value[result.value.length - 1];
-        available++;
-
-        const isMoney = indicators[index][1] === "NY.GDP.PCAP.CD";
-        const value = isMoney
-            ? formatMoney(latest.value, "USD")
-            : latest.value.toFixed(2) + "%";
-
-        html += `<div class="country-row">
-            <span>${indicators[index][0]}</span>
-            <strong>${value}<br><small>${latest.year}</small></strong>
-        </div>`;
-    });
-
-    $("countryStats").innerHTML = html;
-    setText(
-        "countryMessage",
-        available
-            ? "World Bank · latest available observation for each indicator."
-            : "No observations were returned by the source."
-    );
-}
-
-/* =====================================================
-   SETTINGS
-===================================================== */
-
-$("saveSettings").addEventListener("click", () => {
-    const settings = {
-        currency: $("settingsCurrency").value,
-        interval: Number($("refreshInterval").value)
-    };
-
-    try {
-        localStorage.setItem("monetary_archive_settings", JSON.stringify(settings));
-        changeDisplayCurrency(settings.currency);
-        startAutoRefresh(settings.interval);
-        notify("Settings saved in this browser.");
-    } catch {
-        notify("Could not save settings.");
-    }
-});
-
-$("clearCache").addEventListener("click", () => {
-    Object.keys(localStorage)
-        .filter(key => key.startsWith("monetary_archive_") && key !== "monetary_archive_settings")
-        .forEach(key => localStorage.removeItem(key));
-
-    notify("Cached financial data cleared.");
-});
-
-function loadSettings() {
-    try {
-        const settings = JSON.parse(
-            localStorage.getItem("monetary_archive_settings") || "{}"
-        );
-
-        if (settings.currency) {
-            $("settingsCurrency").value = settings.currency;
-            $("displayCurrency").value = settings.currency;
-            state.selectedCurrency = settings.currency;
-        }
-
-        if (settings.interval) {
-            $("refreshInterval").value = String(settings.interval);
-        }
-    } catch {}
-}
-
-/* =====================================================
-   AUTO REFRESH
-===================================================== */
-
-let refreshTimer = null;
-
-function startAutoRefresh(interval) {
-    clearInterval(refreshTimer);
-
-    refreshTimer = setInterval(async () => {
-        await Promise.allSettled([
-            loadRates(),
-            loadGold(),
-            loadBitcoin(),
-            loadDashboardEconomy()
-        ]);
-    }, interval);
-}
-
-/* =====================================================
-   SEARCH
-===================================================== */
-
-$("globalSearch").addEventListener("keydown", event => {
-    if (event.key !== "Enter") return;
-
-    const query = event.target.value.toLowerCase().trim();
-
-    const searchable = [
-        ["dashboard", "dashboard overview"],
-        ["currencies", "currency exchange rates foreign exchange"],
-        ["gold", "gold precious metals"],
-        ["bitcoin", "bitcoin crypto markets"],
-        ["economy", "economy inflation gdp unemployment"],
-        ["globe-page", "globe world countries"],
-        ["calculators", "calculator interest inflation conversion"],
-        ["history", "history archive historical data"],
-        ["settings", "settings preferences"]
-    ];
-
-    const match = searchable.find(item =>
-        item[1].includes(query) || item[0].includes(query)
-    );
-
-    if (match) {
-        showPage(match[0]);
-    } else {
-        notify("No matching section found. Try another search.");
-    }
-});
-
-/* =====================================================
-   CLOCK
-===================================================== */
-
-function updateClock() {
-    setText("clock", new Date().toLocaleTimeString());
-}
-
-setInterval(updateClock, 1000);
-updateClock();
-
-/* =====================================================
-   APPLICATION STARTUP
-===================================================== */
-
-async function initializeArchive() {
-    loadSettings();
-
-    notify("The Monetary Archive is starting...");
-
-    const results = await Promise.allSettled([
-        loadRates(),
-        loadGold(),
-        loadBitcoin(),
-        loadDashboardEconomy()
-    ]);
-
-    calculateConversion();
-    await loadGoldHistory();
-    initGlobe();
-
-    const failed = results.filter(result => result.status === "rejected").length;
-
-    if (failed === 0) {
-        setText("connection", "Connected");
-    }
-
-    startAutoRefresh(Number($("refreshInterval").value));
-
-    setText("lastUpdated", "Last refresh: " + new Date().toLocaleString());
-
-    console.info("The Monetary Archive initialized.");
-}
-
-initializeArchive();
-</script>
-
+      </div>
+      <p>
+        Data is provided by public third-party sources and may be delayed.
+        Figures are informational and should not be treated as financial advice.
+      </p>
+      <div class="footer-bottom">
+        <span>© 2026 THE MONETARY ARCHIVE</span>
+        <span>NBP · COINGECKO · WORLD BANK</span>
+      </div>
+    </footer>
+
+  </div>
 </body>
 </html>
