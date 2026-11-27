@@ -1,672 +1,575 @@
-"use strict";
+/* THE MONETARY ARCHIVE — public-data engine. No API keys. */
 
-window.ArchiveData = (() => {
+(() => {
+  "use strict";
 
-    const API = {
-        nbpRates: "https://api.nbp.pl/api/exchangerates/tables/A/?format=json",
-        nbpGold: "https://api.nbp.pl/api/cenyzlota/last/30/?format=json",
-        frankfurter: "https://api.frankfurter.dev/v1/latest?base=PLN",
-        bitcoin: "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
-        bitcoinCurrent: "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
-        worldBank: "https://api.worldbank.org/v2"
-    };
+  const API = {
+    nbp: "https://api.nbp.pl/api",
+    wb: "https://api.worldbank.org/v2",
+    coin: "https://api.coingecko.com/api/v3"
+  };
 
-    const CACHE_TIME = 5 * 60 * 1000;
-    const cache = new Map();
+  const COUNTRIES = {
+    US: { name: "United States", wb: "USA", currency: "USD", exchanges: ["New York Stock Exchange (NYSE)", "NASDAQ"] },
+    GB: { name: "United Kingdom", wb: "GBR", currency: "GBP", exchanges: ["London Stock Exchange"] },
+    JP: { name: "Japan", wb: "JPN", currency: "JPY", exchanges: ["Tokyo Stock Exchange"] },
+    DE: { name: "Germany", wb: "DEU", currency: "EUR", exchanges: ["Frankfurt Stock Exchange · Xetra"] },
+    FR: { name: "France", wb: "FRA", currency: "EUR", exchanges: ["Euronext Paris"] },
+    CN: { name: "China", wb: "CHN", currency: "CNY", exchanges: ["Shanghai Stock Exchange", "Shenzhen Stock Exchange"] },
+    IN: { name: "India", wb: "IND", currency: "INR", exchanges: ["National Stock Exchange of India", "BSE"] },
+    CA: { name: "Canada", wb: "CAN", currency: "CAD", exchanges: ["Toronto Stock Exchange"] },
+    AU: { name: "Australia", wb: "AUS", currency: "AUD", exchanges: ["Australian Securities Exchange"] },
+    CH: { name: "Switzerland", wb: "CHE", currency: "CHF", exchanges: ["SIX Swiss Exchange"] },
+    BR: { name: "Brazil", wb: "BRA", currency: "BRL", exchanges: ["B3"] },
+    PL: { name: "Poland", wb: "POL", currency: "PLN", exchanges: ["Warsaw Stock Exchange"] },
+    KR: { name: "South Korea", wb: "KOR", currency: "KRW", exchanges: ["Korea Exchange"] },
+    SG: { name: "Singapore", wb: "SGP", currency: "SGD", exchanges: ["Singapore Exchange"] },
+    MX: { name: "Mexico", wb: "MEX", currency: "MXN", exchanges: ["Bolsa Mexicana de Valores"] },
+    ZA: { name: "South Africa", wb: "ZAF", currency: "ZAR", exchanges: ["Johannesburg Stock Exchange"] },
+    SE: { name: "Sweden", wb: "SWE", currency: "SEK", exchanges: ["Nasdaq Stockholm"] },
+    NO: { name: "Norway", wb: "NOR", currency: "NOK", exchanges: ["Oslo Børs"] },
+    DK: { name: "Denmark", wb: "DNK", currency: "DKK", exchanges: ["Nasdaq Copenhagen"] },
+    CZ: { name: "Czechia", wb: "CZE", currency: "CZK", exchanges: ["Prague Stock Exchange"] },
+    HU: { name: "Hungary", wb: "HUN", currency: "HUF", exchanges: ["Budapest Stock Exchange"] },
+    TR: { name: "Türkiye", wb: "TUR", currency: "TRY", exchanges: ["Borsa Istanbul"] },
+    ID: { name: "Indonesia", wb: "IDN", currency: "IDR", exchanges: ["Indonesia Stock Exchange"] },
+    TH: { name: "Thailand", wb: "THA", currency: "THB", exchanges: ["Stock Exchange of Thailand"] },
+    NZ: { name: "New Zealand", wb: "NZL", currency: "NZD", exchanges: ["New Zealand Exchange"] },
+    AR: { name: "Argentina", wb: "ARG", currency: "ARS", exchanges: ["BYMA"] },
+    NG: { name: "Nigeria", wb: "NGA", currency: "NGN", exchanges: ["Nigerian Exchange"] },
+    EG: { name: "Egypt", wb: "EGY", currency: "EGP", exchanges: ["Egyptian Exchange"] },
+    RU: { name: "Russian Federation", wb: "RUS", currency: "RUB", exchanges: ["Moscow Exchange"] },
+    UA: { name: "Ukraine", wb: "UKR", currency: "UAH", exchanges: ["PFTS / Ukrainian Exchange"] }
+  };
 
-    const state = {
-        currency: "USD",
-        rates: { PLN: 1 },
-        rateSources: {},
-        bitcoin: null,
-        gold: null,
-        lastUpdate: null,
-        errors: []
-    };
+  const CURRENCIES = [
+    "USD", "EUR", "GBP", "CHF", "JPY", "CAD", "AUD",
+    "CNY", "INR", "BRL", "PLN", "SEK", "NOK", "DKK",
+    "CZK", "HUF", "KRW", "SGD", "MXN", "ZAR", "TRY",
+    "IDR", "THB", "NZD", "ARS", "NGN", "EGP", "RUB", "UAH"
+  ];
 
-    const CURRENCY_NAMES = {
-        PLN: "Polish Zloty",
-        USD: "US Dollar",
-        EUR: "Euro",
-        GBP: "British Pound",
-        CHF: "Swiss Franc",
-        JPY: "Japanese Yen",
-        CAD: "Canadian Dollar",
-        AUD: "Australian Dollar",
-        CNY: "Chinese Yuan",
-        INR: "Indian Rupee",
-        BRL: "Brazilian Real",
-        SEK: "Swedish Krona",
-        NOK: "Norwegian Krone",
-        DKK: "Danish Krone",
-        CZK: "Czech Koruna",
-        HUF: "Hungarian Forint",
-        ISK: "Icelandic Krona",
-        MXN: "Mexican Peso",
-        NZD: "New Zealand Dollar",
-        SGD: "Singapore Dollar",
-        HKD: "Hong Kong Dollar",
-        KRW: "South Korean Won",
-        TRY: "Turkish Lira",
-        ZAR: "South African Rand",
-        BGN: "Bulgarian Lev",
-        RON: "Romanian Leu",
-        ILS: "Israeli New Shekel",
-        THB: "Thai Baht",
-        MYR: "Malaysian Ringgit",
-        PHP: "Philippine Peso"
-    };
+  const cache = new Map();
 
-    const COUNTRIES = {
-        USA: "United States",
-        POL: "Poland",
-        DEU: "Germany",
-        FRA: "France",
-        GBR: "United Kingdom",
-        JPN: "Japan",
-        CHN: "China",
-        IND: "India",
-        BRA: "Brazil",
-        CAN: "Canada",
-        AUS: "Australia",
-        CHE: "Switzerland",
-        ITA: "Italy",
-        ESP: "Spain",
-        NLD: "Netherlands",
-        SWE: "Sweden",
-        NOR: "Norway",
-        KOR: "South Korea",
-        MEX: "Mexico",
-        ZAF: "South Africa"
-    };
+  let dashboard = null;
+  let loading = null;
+  let lastSuccess = null;
 
-    function remember(key, value) {
-        cache.set(key, {
-            value,
-            time: Date.now()
-        });
+  async function getJSON(url, ttl = 300000) {
+    const cached = cache.get(url);
+
+    if (cached && Date.now() - cached.at < ttl) {
+      return cached.data;
     }
 
-    function recall(key) {
-        const entry = cache.get(key);
-
-        if (!entry) {
-            return null;
-        }
-
-        if (Date.now() - entry.time > CACHE_TIME) {
-            cache.delete(key);
-            return null;
-        }
-
-        return entry.value;
-    }
-
-    async function fetchJSON(url, options = {}) {
-        const cached = recall(url);
-
-        if (cached !== null) {
-            return cached;
-        }
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 18000);
-
-        try {
-            const response = await fetch(url, {
-                ...options,
-                signal: controller.signal,
-                headers: {
-                    Accept: "application/json",
-                    ...(options.headers || {})
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(
-                    `Request failed (${response.status})`
-                );
-            }
-
-            const result = await response.json();
-
-            remember(url, result);
-
-            return result;
-
-        } finally {
-            clearTimeout(timeout);
-        }
-    }
-
-    async function safeFetch(source, url) {
-        try {
-            const data = await fetchJSON(url);
-
-            return {
-                ok: true,
-                data,
-                source
-            };
-
-        } catch (error) {
-            state.errors.push({
-                source,
-                message: error.message,
-                date: new Date().toISOString()
-            });
-
-            return {
-                ok: false,
-                data: null,
-                source,
-                error: error.message
-            };
-        }
-    }
-
-    function setCurrency(code) {
-        const currency = String(code).toUpperCase();
-
-        if (!CURRENCY_NAMES[currency]) {
-            throw new Error(`Unsupported currency: ${currency}`);
-        }
-
-        state.currency = currency;
-    }
-
-    function getCurrency() {
-        return state.currency;
-    }
-
-    function getRate(code) {
-        return state.rates[String(code).toUpperCase()] ?? null;
-    }
-
-    /*
-     * Every rate is stored as:
-     * how many units of this currency equal one PLN.
-     *
-     * Example:
-     * PLN = 1
-     * USD = 0.25
-     *
-     * This makes all conversions use one consistent base.
-     */
-
-    function convert(value, from, to) {
-        const amount = Number(value);
-
-        if (!Number.isFinite(amount)) {
-            return null;
-        }
-
-        const fromRate = getRate(from);
-        const toRate = getRate(to);
-
-        if (
-            fromRate === null ||
-            toRate === null ||
-            fromRate <= 0 ||
-            toRate <= 0
-        ) {
-            return null;
-        }
-
-        return amount / fromRate * toRate;
-    }
-
-    function convertToDisplay(value, sourceCurrency = "PLN") {
-        return convert(value, sourceCurrency, state.currency);
-    }
-
-    function formatMoney(value, currency = state.currency) {
-        if (value === null || value === undefined || !Number.isFinite(Number(value))) {
-            return "Unavailable";
-        }
-
-        try {
-            return new Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency,
-                maximumFractionDigits: 2
-            }).format(Number(value));
-
-        } catch {
-            return `${Number(value).toFixed(2)} ${currency}`;
-        }
-    }
-
-    function formatNumber(value, decimals = 2) {
-        if (value === null || value === undefined || !Number.isFinite(Number(value))) {
-            return "Unavailable";
-        }
-
-        return new Intl.NumberFormat("en-US", {
-            maximumFractionDigits: decimals
-        }).format(Number(value));
-    }
-
-    function formatPercent(value) {
-        if (value === null || value === undefined || !Number.isFinite(Number(value))) {
-            return "Unavailable";
-        }
-
-        const number = Number(value);
-
-        return `${number > 0 ? "+" : ""}${number.toFixed(2)}%`;
-    }
-
-    function changeClass(value) {
-        if (!Number.isFinite(Number(value))) {
-            return "neutral";
-        }
-
-        return Number(value) > 0
-            ? "positive"
-            : Number(value) < 0
-                ? "negative"
-                : "neutral";
-    }
-
-    async function loadNBPRates() {
-        const result = await safeFetch("NBP", API.nbpRates);
-
-        if (!result.ok || !Array.isArray(result.data?.[0]?.rates)) {
-            return false;
-        }
-
-        const newRates = { PLN: 1 };
-        const newSources = { PLN: "NBP base currency" };
-
-        for (const item of result.data[0].rates) {
-            const code = String(item.code).toUpperCase();
-            const plnPerUnit = Number(item.mid);
-
-            if (
-                !Number.isFinite(plnPerUnit) ||
-                plnPerUnit <= 0
-            ) {
-                continue;
-            }
-
-            newRates[code] = 1 / plnPerUnit;
-            newSources[code] = "NBP";
-        }
-
-        state.rates = {
-            ...state.rates,
-            ...newRates
-        };
-
-        state.rateSources = {
-            ...state.rateSources,
-            ...newSources
-        };
-
-        return true;
-    }
-
-    async function loadFallbackRates() {
-        const result = await safeFetch("Frankfurter", API.frankfurter);
-
-        if (!result.ok || !result.data?.rates) {
-            return false;
-        }
-
-        for (const [code, value] of Object.entries(result.data.rates)) {
-            const numeric = Number(value);
-
-            if (
-                !Number.isFinite(numeric) ||
-                numeric <= 0
-            ) {
-                continue;
-            }
-
-            if (!state.rates[code]) {
-                state.rates[code] = numeric;
-                state.rateSources[code] = "Frankfurter";
-            }
-        }
-
-        return true;
-    }
-
-    async function loadBitcoin() {
-        const url =
-            "https://api.coingecko.com/api/v3/simple/price" +
-            "?ids=bitcoin" +
-            "&vs_currencies=usd" +
-            "&include_market_cap=true" +
-            "&include_24hr_vol=true" +
-            "&include_24hr_change=true";
-
-        const result = await safeFetch("CoinGecko", url);
-
-        if (!result.ok || !result.data?.bitcoin) {
-            state.bitcoin = null;
-            return false;
-        }
-
-        const btc = result.data.bitcoin;
-
-        const price = convert(
-            btc.usd,
-            "USD",
-            state.currency
-        );
-
-        const marketCap = convert(
-            btc.usd_market_cap,
-            "USD",
-            state.currency
-        );
-
-        const volume = convert(
-            btc.usd_24h_vol,
-            "USD",
-            state.currency
-        );
-
-        state.bitcoin = {
-            price,
-            priceUSD: Number(btc.usd),
-            marketCap,
-            volume,
-            change24h: Number(btc.usd_24h_change),
-            source: "CoinGecko",
-            currency: state.currency,
-            updatedAt: new Date().toISOString()
-        };
-
-        return true;
-    }
-
-    async function loadBitcoinHistory(days = 30) {
-        const allowed = [1, 7, 30, 90, 365];
-        const period = Number(days);
-
-        if (!allowed.includes(period)) {
-            throw new Error("Unsupported Bitcoin history period.");
-        }
-
-        const url =
-            `${API.bitcoin}/bitcoin/market_chart` +
-            `?vs_currency=usd&days=${period}`;
-
-        const result = await safeFetch("CoinGecko", url);
-
-        if (!result.ok || !Array.isArray(result.data?.prices)) {
-            return [];
-        }
-
-        return result.data.prices.map(point => ({
-            timestamp: Number(point[0]),
-            date: new Date(Number(point[0])),
-            value: convert(
-                Number(point[1]),
-                "USD",
-                state.currency
-            )
-        })).filter(item =>
-            Number.isFinite(item.value)
-        );
-    }
-
-    async function loadGold() {
-        const result = await safeFetch("NBP Gold", API.nbpGold);
-
-        if (!result.ok || !Array.isArray(result.data) || !result.data.length) {
-            state.gold = null;
-            return false;
-        }
-
-        const latest = result.data[result.data.length - 1];
-        const pricePLN = Number(latest.cena);
-
-        if (!Number.isFinite(pricePLN)) {
-            state.gold = null;
-            return false;
-        }
-
-        state.gold = {
-            pricePerGram: convertToDisplay(pricePLN, "PLN"),
-            pricePerOunce: convertToDisplay(
-                pricePLN * 31.1034768,
-                "PLN"
-            ),
-            pricePerGramPLN: pricePLN,
-            date: latest.data,
-            source: "National Bank of Poland",
-            currency: state.currency
-        };
-
-        return true;
-    }
-
-    async function loadGoldHistory() {
-        const result = await safeFetch("NBP Gold", API.nbpGold);
-
-        if (!result.ok || !Array.isArray(result.data)) {
-            return [];
-        }
-
-        return result.data.map(item => ({
-            date: item.data,
-            value: convertToDisplay(Number(item.cena), "PLN"),
-            valuePLN: Number(item.cena)
-        })).filter(item =>
-            Number.isFinite(item.value)
-        );
-    }
-
-    const ECONOMIC_INDICATORS = {
-        gdp: {
-            code: "NY.GDP.MKTP.KD.ZG",
-            label: "GDP growth",
-            unit: "%"
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 16000);
+
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json"
         },
+        cache: "no-store"
+      });
 
-        inflation: {
-            code: "FP.CPI.TOTL.ZG",
-            label: "Inflation",
-            unit: "%"
-        },
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
-        unemployment: {
-            code: "SL.UEM.TOTL.ZS",
-            label: "Unemployment",
-            unit: "%"
-        },
+      const data = await response.json();
 
-        population: {
-            code: "SP.POP.TOTL",
-            label: "Population",
-            unit: ""
-        },
+      cache.set(url, {
+        at: Date.now(),
+        data
+      });
 
-        gdpPerCapita: {
-            code: "NY.GDP.PCAP.CD",
-            label: "GDP per capita",
-            unit: "USD"
-        }
+      return data;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const num = value => {
+    if (value === null || value === undefined || value === "") {
+      return null;
+    }
+
+    return Number.isFinite(Number(value))
+      ? Number(value)
+      : null;
+  };
+
+  /* NATIONAL BANK OF POLAND */
+
+  async function nbp() {
+    const [tableResult, goldResult] = await Promise.allSettled([
+      getJSON(`${API.nbp}/exchangerates/tables/a/?format=json`),
+      getJSON(`${API.nbp}/cenyzlota/last/1/?format=json`)
+    ]);
+
+    if (
+      tableResult.status !== "fulfilled" ||
+      !tableResult.value?.[0]?.rates
+    ) {
+      throw new Error("NBP rate table unavailable");
+    }
+
+    const table = tableResult.value[0];
+
+    const gold = goldResult.status === "fulfilled"
+      ? goldResult.value
+      : null;
+
+    const plnPerUnit = {
+      PLN: 1
     };
 
-    async function loadEconomy(countryCode, indicatorCode) {
-        const country = String(countryCode).toUpperCase();
-
-        if (!/^[A-Z]{3}$/.test(country)) {
-            throw new Error("Invalid country code.");
-        }
-
-        const allowed = Object.values(ECONOMIC_INDICATORS)
-            .map(item => item.code);
-
-        if (!allowed.includes(indicatorCode)) {
-            throw new Error("Unsupported economic indicator.");
-        }
-
-        const url =
-            `${API.worldBank}/country/${country}` +
-            `/indicator/${indicatorCode}` +
-            "?format=json&per_page=30";
-
-        const result = await safeFetch("World Bank", url);
-
-        if (!result.ok || !Array.isArray(result.data?.[1])) {
-            return [];
-        }
-
-        return result.data[1]
-            .filter(item => item.value !== null)
-            .map(item => ({
-                year: String(item.date),
-                value: Number(item.value),
-                country: item.country?.value || country,
-                indicator: item.indicator?.value || indicatorCode,
-                source: "World Bank"
-            }))
-            .filter(item => Number.isFinite(item.value))
-            .sort((a, b) => Number(b.year) - Number(a.year));
-    }
-
-    async function loadCountryOverview(countryCode) {
-        const entries = Object.entries(ECONOMIC_INDICATORS);
-
-        const results = await Promise.all(
-            entries.map(async ([key, indicator]) => ({
-                key,
-                records: await loadEconomy(
-                    countryCode,
-                    indicator.code
-                )
-            }))
-        );
-
-        const output = {};
-
-        for (const item of results) {
-            output[item.key] = item.records[0] || null;
-        }
-
-        return output;
-    }
-
-    async function loadCountryList() {
-        const url =
-            `${API.worldBank}/country?format=json&per_page=300`;
-
-        const result = await safeFetch("World Bank", url);
-
-        if (!result.ok || !Array.isArray(result.data?.[1])) {
-            return [];
-        }
-
-        return result.data[1]
-            .filter(item =>
-                item.region &&
-                item.region.id !== "NA"
-            )
-            .map(item => ({
-                code: item.id,
-                name: item.name,
-                capital: item.capitalCity,
-                region: item.region.value,
-                income: item.incomeLevel?.value
-            }));
-    }
-
-    function getCurrencies() {
-        return Object.keys(state.rates)
-            .sort()
-            .map(code => ({
-                code,
-                name: CURRENCY_NAMES[code] || code,
-                rate: convert(1, code, state.currency),
-                source: state.rateSources[code] || "Reference data"
-            }));
-    }
-
-    async function loadAll() {
-        state.errors = [];
-
-        /*
-         * Load exchange rates first because BTC and gold
-         * conversions depend on them.
-         */
-
-        await Promise.all([
-            loadNBPRates(),
-            loadFallbackRates()
-        ]);
-
-        /*
-         * Run financial requests after rates have been loaded.
-         */
-
-        const results = await Promise.allSettled([
-            loadBitcoin(),
-            loadGold()
-        ]);
-
-        state.lastUpdate = new Date();
-
-        return {
-            rates: { ...state.rates },
-            bitcoin: state.bitcoin,
-            gold: state.gold,
-            errors: [...state.errors],
-            results,
-            updatedAt: state.lastUpdate
-        };
-    }
-
-    function getState() {
-        return {
-            currency: state.currency,
-            rates: { ...state.rates },
-            rateSources: { ...state.rateSources },
-            bitcoin: state.bitcoin
-                ? { ...state.bitcoin }
-                : null,
-            gold: state.gold
-                ? { ...state.gold }
-                : null,
-            lastUpdate: state.lastUpdate,
-            errors: [...state.errors]
-        };
+    for (const item of table.rates) {
+      plnPerUnit[item.code] = num(item.mid);
     }
 
     return {
-        loadAll,
-        loadNBPRates,
-        loadFallbackRates,
-        loadBitcoin,
-        loadBitcoinHistory,
-        loadGold,
-        loadGoldHistory,
-        loadEconomy,
-        loadCountryOverview,
-        loadCountryList,
+      plnPerUnit,
+      tableDate: table.effectiveDate,
+      tableNo: table.no,
 
-        setCurrency,
-        getCurrency,
-        getRate,
-        getCurrencies,
-        getState,
+      goldPLNPerGram: num(gold?.[0]?.cena),
+      goldDate: gold?.[0]?.data,
 
-        convert,
-        convertToDisplay,
+      rates: table.rates.map(item => ({
+        code: item.code,
+        name: item.currency,
+        pln: num(item.mid)
+      })),
 
-        formatMoney,
-        formatNumber,
-        formatPercent,
-        changeClass,
-
-        currencyNames: { ...CURRENCY_NAMES },
-        countries: { ...COUNTRIES },
-        indicators: { ...ECONOMIC_INDICATORS }
+      goldError: goldResult.status === "rejected"
+        ? goldResult.reason.message
+        : null
     };
+  }
+
+  /* COINGECKO */
+
+  async function bitcoin() {
+    const [spotResult, historyResult] = await Promise.allSettled([
+      getJSON(
+        `${API.coin}/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true&include_last_updated_at=true`,
+        120000
+      ),
+
+      getJSON(
+        `${API.coin}/coins/bitcoin/market_chart?vs_currency=usd&days=30&interval=daily`,
+        600000
+      )
+    ]);
+
+    if (spotResult.status !== "fulfilled") {
+      throw spotResult.reason;
+    }
+
+    const bitcoinData = spotResult.value.bitcoin;
+
+    if (!bitcoinData || !Number.isFinite(bitcoinData.usd)) {
+      throw new Error("Bitcoin price unavailable");
+    }
+
+    const history = historyResult.status === "fulfilled"
+      ? historyResult.value
+      : null;
+
+    return {
+      usd: bitcoinData.usd,
+
+      change24h: num(bitcoinData.usd_24h_change),
+
+      marketCapUsd: num(bitcoinData.usd_market_cap),
+
+      volume24hUsd: num(bitcoinData.usd_24h_vol),
+
+      updatedAt: bitcoinData.last_updated_at
+        ? new Date(bitcoinData.last_updated_at * 1000).toISOString()
+        : new Date().toISOString(),
+
+      history: (history?.prices || [])
+        .map(item => ({
+          time: item[0],
+          value: num(item[1])
+        }))
+        .filter(item => item.value !== null),
+
+      historyError: historyResult.status === "rejected"
+        ? historyResult.reason.message
+        : null
+    };
+  }
+
+  /* WORLD BANK */
+
+  const wbToIso = Object.fromEntries(
+    Object.entries(COUNTRIES).map(([iso, country]) => [
+      country.wb,
+      iso
+    ])
+  );
+
+  async function wbIndicator(iso, indicator) {
+    const country = COUNTRIES[iso];
+
+    if (!country) {
+      throw new Error("Country profile is not configured");
+    }
+
+    const url =
+      `${API.wb}/country/${country.wb}/indicator/${indicator}?format=json&per_page=5`;
+
+    const data = await getJSON(url, 3600000);
+
+    return (data?.[1] || [])
+      .filter(item => item.value !== null)
+      .map(item => ({
+        country: iso,
+        countryName: country.name,
+        indicator,
+        indicatorName: item.indicator?.value || indicator,
+        value: num(item.value),
+        year: String(item.date),
+        date: String(item.date),
+        unit: "%",
+        source: "World Bank"
+      }))
+      .filter(item => item.value !== null)
+      .sort((a, b) => b.year - a.year);
+  }
+
+  async function economics() {
+    const codes = {
+      inflation: "FP.CPI.TOTL.ZG",
+      gdp: "NY.GDP.MKTP.KD.ZG",
+      unemployment: "SL.UEM.TOTL.ZS"
+    };
+
+    const countryList = Object.values(COUNTRIES)
+      .map(country => country.wb)
+      .join(";");
+
+    const jobs = Object.entries(codes);
+
+    const results = await Promise.allSettled(
+      jobs.map(([kind, indicator]) =>
+        getJSON(
+          `${API.wb}/country/${countryList}/indicator/${indicator}?format=json&per_page=2000`,
+          3600000
+        )
+      )
+    );
+
+    const records = [];
+    const failures = [];
+
+    results.forEach((result, index) => {
+      const [kind, indicator] = jobs[index];
+
+      if (result.status !== "fulfilled") {
+        failures.push(
+          `${kind}: ${result.reason?.message || "unavailable"}`
+        );
+        return;
+      }
+
+      const rows = result.value?.[1] || [];
+
+      for (const item of rows) {
+        if (item.value === null) {
+          continue;
+        }
+
+        const iso = wbToIso[item.country?.id];
+
+        if (!iso) {
+          continue;
+        }
+
+        records.push({
+          country: iso,
+          countryName: COUNTRIES[iso].name,
+          indicator,
+          indicatorName: item.indicator?.value || indicator,
+          value: num(item.value),
+          year: String(item.date),
+          date: String(item.date),
+          unit: "%",
+          source: "World Bank",
+          kind
+        });
+      }
+    });
+
+    return {
+      records: records.filter(item => item.value !== null),
+      failures
+    };
+  }
+
+  /* MAIN DASHBOARD */
+
+  async function loadDashboard(force = false) {
+    if (loading) {
+      return loading;
+    }
+
+    if (
+      !force &&
+      dashboard &&
+      Date.now() - dashboard.checkedAt < 300000
+    ) {
+      return dashboard;
+    }
+
+    loading = (async () => {
+      const [fx, btc, econ] = await Promise.allSettled([
+        nbp(),
+        bitcoin(),
+        economics()
+      ]);
+
+      const data = {
+        checkedAt: Date.now(),
+        generatedAt: new Date().toISOString(),
+
+        fx: fx.status === "fulfilled"
+          ? fx.value
+          : null,
+
+        bitcoin: btc.status === "fulfilled"
+          ? btc.value
+          : null,
+
+        economy: econ.status === "fulfilled"
+          ? econ.value.records
+          : [],
+
+        errors: {
+          fx: fx.status === "rejected"
+            ? fx.reason.message
+            : null,
+
+          bitcoin: btc.status === "rejected"
+            ? btc.reason.message
+            : null,
+
+          economy: econ.status === "rejected"
+            ? econ.reason.message
+            : null
+        },
+
+        sources: [
+          {
+            name: "National Bank of Poland",
+            status: fx.status === "fulfilled" ? "online" : "error",
+            date: fx.status === "fulfilled"
+              ? fx.value.tableDate
+              : null,
+            error: fx.status === "rejected"
+              ? fx.reason.message
+              : null
+          },
+
+          {
+            name: "CoinGecko",
+            status: btc.status === "fulfilled" ? "online" : "error",
+            date: btc.status === "fulfilled"
+              ? btc.value.updatedAt
+              : null,
+            error: btc.status === "rejected"
+              ? btc.reason.message
+              : null
+          },
+
+          {
+            name: "World Bank",
+            status: econ.status === "fulfilled" ? "online" : "error",
+            date: null,
+            error: econ.status === "rejected"
+              ? econ.reason.message
+              : null
+          }
+        ]
+      };
+
+      if (
+        !data.fx &&
+        !data.bitcoin &&
+        !data.economy.length &&
+        lastSuccess
+      ) {
+        return lastSuccess;
+      }
+
+      dashboard = data;
+
+      if (data.fx || data.bitcoin || data.economy.length) {
+        lastSuccess = data;
+      }
+
+      return data;
+    })().finally(() => {
+      loading = null;
+    });
+
+    return loading;
+  }
+
+  /* CURRENCY CONVERSION */
+
+  function rate(currency, fx = dashboard?.fx) {
+    if (currency === "PLN") {
+      return 1;
+    }
+
+    return fx?.plnPerUnit?.[currency] ?? null;
+  }
+
+  function convert(amount, from, to, fx = dashboard?.fx) {
+    const value = num(amount);
+    const fromRate = rate(from, fx);
+    const toRate = rate(to, fx);
+
+    if (
+      value === null ||
+      fromRate === null ||
+      toRate === null ||
+      toRate === 0
+    ) {
+      return null;
+    }
+
+    return value * fromRate / toRate;
+  }
+
+  function format(value, currency = "USD", digits = 2) {
+    if (!Number.isFinite(value)) {
+      return "—";
+    }
+
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency,
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      }).format(value);
+    } catch {
+      return `${value.toFixed(digits)} ${currency}`;
+    }
+  }
+
+  /* GOLD */
+
+  function goldIn(currency, fx = dashboard?.fx) {
+    if (!fx || !Number.isFinite(fx.goldPLNPerGram)) {
+      return null;
+    }
+
+    const perGram = convert(
+      fx.goldPLNPerGram,
+      "PLN",
+      currency,
+      fx
+    );
+
+    return perGram === null
+      ? null
+      : perGram * 31.1034768;
+  }
+
+  /* COUNTRY DATA */
+
+  function getCountry(code) {
+    return COUNTRIES[code] || null;
+  }
+
+  async function getCountryData(code) {
+    const country = getCountry(code);
+
+    if (!country) {
+      throw new Error("Country profile is not configured");
+    }
+
+    const definitions = {
+      "GDP growth": "NY.GDP.MKTP.KD.ZG",
+      "Inflation": "FP.CPI.TOTL.ZG",
+      "Unemployment": "SL.UEM.TOTL.ZS"
+    };
+
+    const results = await Promise.allSettled(
+      Object.entries(definitions).map(([name, indicator]) =>
+        wbIndicator(code, indicator).then(rows => ({
+          name,
+          latest: rows[0] || null,
+          history: rows
+        }))
+      )
+    );
+
+    return {
+      country,
+
+      indicators: results
+        .filter(result => result.status === "fulfilled")
+        .map(result => result.value),
+
+      errors: results
+        .filter(result => result.status === "rejected")
+        .map(result => result.reason.message)
+    };
+  }
+
+  /* BITCOIN HISTORY */
+
+  async function getBitcoinHistory(days = 30) {
+    const safeDays = Math.max(
+      1,
+      Math.min(365, Number(days) || 30)
+    );
+
+    const data = await getJSON(
+      `${API.coin}/coins/bitcoin/market_chart?vs_currency=usd&days=${safeDays}&interval=daily`,
+      600000
+    );
+
+    return (data.prices || [])
+      .map(item => ({
+        time: item[0],
+        value: num(item[1])
+      }))
+      .filter(item => item.value !== null);
+  }
+
+  /* PUBLIC INTERFACE */
+
+  window.ArchiveData = Object.freeze({
+    version: "2.0.0",
+
+    currencies: CURRENCIES,
+    countries: COUNTRIES,
+
+    loadDashboard,
+    convert,
+    format,
+    goldIn,
+
+    getCountry,
+    getCountryData,
+    getBitcoinHistory,
+
+    clearCache() {
+      cache.clear();
+      dashboard = null;
+    },
+
+    getDashboard: () => dashboard
+  });
 
 })();
