@@ -3,126 +3,263 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financial Verdict — Economic Analyzer</title>
+    <title>Financial Verdict — Southern Gothic Edition</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background-color: #090d16;
-            color: #f3f4f6;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #050508;
+            color: #afb1b6;
+            font-family: 'Georgia', serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             min-height: 100vh;
-            padding: 20px;
+            padding: 40px 20px;
         }
         .container {
-            background-color: #111827;
-            border: 1px solid #1f2937;
-            border-radius: 20px;
+            background-color: #0c0d12;
+            border: 1px solid #23252f;
+            border-radius: 2px;
             padding: 40px 30px;
-            max-width: 550px;
+            max-width: 650px;
             width: 100%;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 5px; left: 5px; right: 5px; bottom: 5px;
+            border: 1px solid #14161f;
+            pointer-events: none;
         }
         .brand {
             text-transform: uppercase;
-            font-size: 12px;
-            letter-spacing: 2px;
-            color: #10b981;
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: #8c2d19;
             text-align: center;
-            margin-bottom: 6px;
-            font-weight: 700;
+            margin-bottom: 12px;
+            font-weight: bold;
         }
-        h1 { color: #ffffff; font-size: 28px; margin-bottom: 8px; text-align: center; font-weight: 800; }
-        .subtitle { color: #9ca3af; font-size: 14px; text-align: center; margin-bottom: 32px; }
-        .input-group { margin-bottom: 20px; }
-        label { display: block; font-size: 13px; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        h1 { 
+            color: #d2d4da; 
+            font-size: 32px; 
+            margin-bottom: 6px; 
+            text-align: center; 
+            font-weight: normal; 
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+        .subtitle { 
+            color: #5c5e66; 
+            font-size: 14px; 
+            text-align: center; 
+            margin-bottom: 40px; 
+            font-style: italic;
+        }
+        .section-title {
+            font-size: 18px;
+            color: #d2d4da;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #23252f;
+            padding-bottom: 8px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .input-group { margin-bottom: 24px; }
+        label { display: block; font-size: 12px; color: #7c7e87; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
         input, select {
             width: 100%;
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            color: #fff;
+            background-color: #11121a;
+            border: 1px solid #23252f;
+            color: #d2d4da;
             padding: 14px;
-            border-radius: 10px;
+            border-radius: 0px;
             font-size: 16px;
             outline: none;
-            transition: all 0.2s;
+            font-family: 'Georgia', serif;
         }
-        input:focus, select:focus { border-color: #10b981; background-color: #141b2d; }
+        input:focus, select:focus { border-color: #8c2d19; background-color: #0d0e14; }
         .btn {
             width: 100%;
-            background-color: #10b981;
-            color: #090d16;
+            background-color: #8c2d19;
+            color: #ffffff;
             border: none;
             padding: 16px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: 2px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s;
             margin-top: 10px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
-        .btn:hover { background-color: #059669; transform: translateY(-1px); }
+        .btn:hover { background-color: #b13a20; box-shadow: 0 0 15px rgba(140,45,25,0.4); }
+        
+        /* Блок результатов и графиков */
         .result-box {
-            margin-top: 30px;
+            margin-top: 35px;
             padding: 24px;
-            background-color: #141b2d;
-            border: 1px solid #1f2937;
-            border-radius: 14px;
+            background-color: #08090d;
+            border: 1px solid #1c1d26;
             display: none;
         }
-        .result-title { color: #ffffff; font-size: 18px; margin-bottom: 16px; font-weight: 700; border-bottom: 1px solid #1f2937; padding-bottom: 10px; }
+        .result-box-title { color: #d2d4da; font-size: 16px; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; }
         .result-item { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 15px; }
-        .result-val { font-weight: 700; color: #fff; }
-        .verdict { margin-top: 16px; padding-top: 16px; border-top: 1px solid #1f2937; font-size: 14px; color: #9ca3af; line-height: 1.6; }
+        .result-val { font-weight: bold; color: #d2d4da; }
+        .verdict { margin-top: 16px; padding-top: 16px; border-top: 1px solid #1c1d26; font-size: 14px; color: #7c7e87; line-height: 1.6; font-style: italic; }
+        
+        /* Стили кастомного CSS-графика */
+        .chart-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            height: 150px;
+            margin-top: 25px;
+            border-bottom: 1px solid #23252f;
+            padding-bottom: 10px;
+        }
+        .chart-bar-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 15%;
+            height: 100%;
+            justify-content: flex-end;
+        }
+        .chart-bar {
+            width: 100%;
+            background-color: #8c2d19;
+            position: relative;
+            transition: height 0.5s ease-in-out;
+            min-height: 5px;
+            opacity: 0.7;
+        }
+        .chart-bar:hover { opacity: 1; background-color: #b13a20; }
+        .chart-val {
+            position: absolute;
+            top: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: #afb1b6;
+        }
+        .chart-label {
+            font-size: 11px;
+            color: #5c5e66;
+            margin-top: 8px;
+        }
+
+        /* Блок симулятора и статистики */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background-color: #11121a;
+            border: 1px solid #23252f;
+            padding: 16px;
+        }
+        .stat-card h3 { font-size: 11px; color: #5c5e66; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px;}
+        .stat-card p { font-size: 20px; color: #8c2d19; }
+        .manifesto-text { font-size: 14px; line-height: 1.7; color: #7c7e87; font-style: italic; }
+        
+        .simulation-log {
+            background-color: #08090d;
+            border-left: 3px solid #23252f;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 13px;
+            min-height: 65px;
+            transition: all 0.3s;
+        }
     </style>
 </head>
 <body>
 
+<!-- КОНТЕЙНЕР 1: КАЛЬКУЛЯТОР С ВЕРДИКТОМ -->
 <div class="container">
-    <div class="brand">Economic Analysis</div>
+    <div class="brand">The Weight of Time & Decay</div>
     <h1>FINANCIAL VERDICT</h1>
-    <div class="subtitle">Calculate the real purchasing power of your future capital</div>
+    <div class="subtitle">"Shadows grow long, and paper wealth turns to dust..."</div>
 
     <div class="input-group">
-        <label>Target Capital</label>
-        <input type="number" id="target" value="1000000" placeholder="Enter target amount">
+        <label>Target Capital (Your Desire)</label>
+        <input type="number" id="target" value="1000000">
     </div>
 
     <div class="input-group">
-        <label>Time Horizon (Years)</label>
-        <input type="number" id="years" value="5" placeholder="Enter number of years">
+        <label>Time Horizon (Years in the Dark)</label>
+        <input type="number" id="years" value="5">
     </div>
 
     <div class="input-group">
-        <label>Currency & Economic Zone</label>
+        <label>Economic Threshold (Inflation Rate)</label>
         <select id="inflation">
-            <option value="2.5">US Dollar (USD) — Inflation ~2.5%</option>
-            <option value="2.0">Eurozone (EUR) — Inflation ~2.0%</option>
-            <option value="4.5">Poland (PLN) — Inflation ~4.5%</option>
+            <option value="2.5">US Dollar (USD) — 2.5% Decay</option>
+            <option value="2.0">Eurozone (EUR) — 2.0% Decay</option>
+            <option value="4.5">Poland (PLN) — 4.5% Decay</option>
         </select>
     </div>
 
-    <button class="btn" onclick="calculateVerdict()">Get Verdict</button>
+    <button class="btn" onclick="calculateVerdict()">Extract Verdict</button>
 
     <div class="result-box" id="resultBox">
-        <div class="result-title">Calculation Results:</div>
+        <div class="result-box-title">The Grim Reality:</div>
         <div class="result-item">
-            <span>Nominal Target:</span>
+            <span>Nominal Illusions:</span>
             <span class="result-val" id="resNominal">0</span>
         </div>
         <div class="result-item">
             <span>Real Purchasing Power:</span>
-            <span class="result-val" id="resReal" style="color: #ef4444;">0</span>
+            <span class="result-val" id="resReal" style="color: #8c2d19;">0</span>
         </div>
         <div class="result-item">
-            <span>Required Monthly Savings:</span>
-            <span class="result-val" id="resMonthly" style="color: #38bdf8;">0</span>
+            <span>Monthly Sacrifice Required:</span>
+            <span class="result-val" id="resMonthly" style="color: #ba9663;">0</span>
         </div>
+        
+        <!-- Кастомный визуальный график деградации -->
+        <div class="chart-container" id="visualChart"></div>
+        
         <div class="verdict" id="resVerdict"></div>
+        <div class="verdict" id="prophecyText" style="color: #ba9663; text-align: center; border-top: none; padding-top: 5px;"></div>
+    </div>
+</div>
+
+<!-- КОНТЕЙНЕР 2: ИНТЕРАКТИВНЫЙ СИМУЛЯТОР ЦИКЛОВ -->
+<div class="container">
+    <div class="section-title">Market Cycle Simulator</div>
+    <div class="manifesto-text">Trigger a random macroeconomic shift to test how external storms deform financial architecture.</div>
+    <button class="btn" style="background-color: #23252f; border: 1px solid #3a3d4e; margin-top: 15px;" onclick="simulateCycle()">Trigger Macro Shift</button>
+    <div class="simulation-log" id="simulationLog">
+        <span style="color: #5c5e66; font-style: italic;">The market is currently quiet. Awaiting structural shifts...</span>
+    </div>
+</div>
+
+<!-- КОНТЕЙНЕР 3: ЭКОНОМИЧЕСКАЯ СТАТИСТИКА -->
+<div class="container">
+    <div class="section-title">Global Economic Baselines</div>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>US Fed Interest Rate</h3>
+            <p>4.75% - 5.00%</p>
+        </div>
+        <div class="stat-card">
+            <h3>Eurozone Inflation Index</h3>
+            <p>2.0% annual</p>
+        </div>
+        <div class="stat-card">
+            <h3>Poland Core Inflation</h3>
+            <p>4.5% stable</p>
+        </div>
+        <div class="stat-card">
+            <h3>Global Gold Reserve Value</h3>
+            <p>$2,650 / oz</p>
+        </div>
     </div>
 </div>
 
