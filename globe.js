@@ -1,547 +1,187 @@
+/* ==========================================================
+   THE MONETARY ARCHIVE — INTERACTIVE 3D GLOBE
+   Globe.gl + world-atlas + ISO country mapping
+========================================================== */
 
-/* =========================================================
-   THE MONETARY ARCHIVE
-   INTERACTIVE 3D GLOBE
-   ========================================================= */
+(() => {
+  "use strict";
 
-(function () {
-    "use strict";
+  let globe = null;
+  let countryFeatures = [];
+  let selectedFeature = null;
+  let resizeObserver = null;
 
-    const CONFIG = {
-        topologyURL:
-            "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
+  const container = document.getElementById("globeViz");
 
-        namesURL:
-            "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.tsv",
+  function emitCountry(feature) {
+    if (!feature) return;
 
-        countriesURL:
-            "https://restcountries.com/v3.1/all?fields=name,cca2,cca3,currencies,capital,region",
+    const properties = feature.properties || {};
+    const iso3 = properties.iso3 || null;
+    const name = properties.name || "Unknown country";
 
-        earthTexture:
-            "https://unpkg.com/three-globe/example/img/earth-night.jpg",
+    window.dispatchEvent(new CustomEvent("archive:country", {
+      detail: { name, iso3 }
+    }));
+  }
 
-        backgroundColor: "#070a10",
+  function setSelected(feature) {
+    selectedFeature = feature || null;
 
-        initialAltitude: 2.25,
-        minimumAltitude: 1.35,
-        maximumAltitude: 5.5,
+    if (globe) {
+      globe.polygonsData(countryFeatures);
+    }
 
-        autoRotateSpeed: 0.35
-    };
+    emitCountry(feature);
+  }
 
+  function polygonAltitude(feature) {
+    return feature === selectedFeature ? 0.035 : 0.006;
+  }
 
-    let globe = null;
-    let polygons = [];
-    let countryIndex = new Map();
-    let selectedCountry = null;
-    let autoRotate = true;
-    let resizeObserver = null;
+  function polygonColor(feature) {
+    return feature === selectedFeature
+      ? "rgba(224, 190, 112, 0.82)"
+      : "rgba(180, 160, 118, 0.16)";
+  }
 
+  async function loadJSON(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Could not load map data (${response.status})`);
+    return response.json();
+  }
 
-    /* =====================================================
-       COUNTRY DATA
-    ===================================================== */
+  async function initialiseGlobe() {
+    if (!container) return;
 
-    async function fetchText(url) {
-        const response = await fetch(url);
+    if (typeof Globe !== "function" || typeof topojson === "undefined") {
+      container.innerHTML =
+        '<div class="globe-loading">The globe libraries could not be loaded. Check your internet connection and reload the page.</div>';
+      return;
+    }
 
-        if (!response.ok) {
-            throw new Error(`Could not load ${url}`);
+    try {
+      const [topology, countryList] = await Promise.all([
+        loadJSON("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"),
+        loadJSON("https://cdn.jsdelivr.net/npm/world-countries@5.1.0/countries.json")
+      ]);
+
+      const countryMap = new Map();
+
+      countryList.forEach(country => {
+        if (country.ccn3 && country.cca3) {
+          countryMap.set(String(country.ccn3).padStart(3, "0"), country.cca3);
         }
+      });
 
-        return response.text();
-    }
+      const collection = topojson.feature(
+        topology,
+        topology.objects.countries
+      );
 
-
-    async function fetchJSON(url) {
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error(`Could not load ${url}`);
-        }
-
-        return response.json();
-    }
-
-
-    function normalizeName(value) {
-        return String(value || "")
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, "");
-    }
-
-
-    function parseTSV(text) {
-        const lines = text.trim().split(/\r?\n/);
-        const result = new Map();
-
-        lines.slice(1).forEach(function (line) {
-            const columns = line.split("\t");
-
-            if (columns.length < 2) return;
-
-            result.set(
-                String(columns[0]).trim(),
-                String(columns[1]).trim()
-            );
-        });
-
-        return result;
-    }
-
-
-    async function loadCountryIndex() {
-        const countries = await fetchJSON(CONFIG.countriesURL);
-
-        const index = new Map();
-
-        countries.forEach(function (country) {
-            const name = country.name
-                ? country.name.common
-                : "";
-
-            const code = country.cca2 || "";
-
-            if (!name || !code) return;
-
-            index.set(normalizeName(name), {
-                name: name,
-                code: code,
-                alpha3: country.cca3 || "",
-                currencies: country.currencies || {},
-                capital: country.capital || [],
-                region: country.region || ""
-            });
-        });
-
-        const aliases = {
-            "unitedstatesofamerica": "US",
-            "unitedstates": "US",
-            "russia": "RU",
-            "southkorea": "KR",
-            "northkorea": "KP",
-            "ivorycoast": "CI",
-            "czechrepublic": "CZ",
-            "democraticrepublicofthecongo": "CD",
-            "republicofthecongo": "CG",
-            "vietnam": "VN",
-            "syria": "SY",
-            "iran": "IR",
-            "tanzania": "TZ",
-            "bolivia": "BO",
-            "venezuela": "VE",
-            "moldova": "MD",
-            "brunei": "BN",
-            "laos": "LA",
-            "micronesia": "FM",
-            "palestine": "PS"
-        };
-
-        Object.entries(aliases).forEach(function ([name, code]) {
-            const country = countries.find(item => item.cca2 === code);
-
-            if (country) {
-                index.set(name, {
-                    name: country.name.common,
-                    code: country.cca2,
-                    alpha3: country.cca3 || "",
-                    currencies: country.currencies || {},
-                    capital: country.capital || [],
-                    region: country.region || ""
-                });
-            }
-        });
-
-        countryIndex = index;
-    }
-
-
-    /* =====================================================
-       BUILD GEOGRAPHY
-    ===================================================== */
-
-    async function loadPolygons() {
-        if (!window.topojson) {
-            throw new Error("TopoJSON library is not available.");
-        }
-
-        const [topology, namesText] = await Promise.all([
-            fetchJSON(CONFIG.topologyURL),
-            fetchText(CONFIG.namesURL)
-        ]);
-
-        const names = parseTSV(namesText);
-
-        const countries = window.topojson.feature(
-            topology,
-            topology.objects.countries
-        ).features;
-
-        return countries.map(function (feature) {
-            const id = String(feature.id);
-
-            const name = names.get(id) || `Country ${id}`;
-
-            const normalized = normalizeName(name);
-
-            const profile = countryIndex.get(normalized) || null;
-
-            return {
-                ...feature,
-
-                properties: {
-                    ...(feature.properties || {}),
-                    name: name,
-                    code: profile ? profile.code : null,
-                    alpha3: profile ? profile.alpha3 : null,
-                    currency: profile
-                        ? Object.keys(profile.currencies)[0] || null
-                        : null
-                }
-            };
-        });
-    }
-
-
-    /* =====================================================
-       COUNTRY SELECTION
-    ===================================================== */
-
-    function selectCountry(feature) {
-        if (!feature || !feature.properties) return;
-
-        selectedCountry = feature;
-
-        const properties = feature.properties;
-
-        const country = {
-            name: properties.name || "Unknown country",
-            code: properties.code || null,
-            alpha3: properties.alpha3 || null,
-            currency: properties.currency || null
-        };
-
-        window.dispatchEvent(
-            new CustomEvent("archive:country-selected", {
-                detail: country
-            })
+      countryFeatures = collection.features.map(feature => {
+        const numericId = String(feature.id).padStart(3, "0");
+        const matchingCountry = countryList.find(
+          item => String(item.ccn3 || "").padStart(3, "0") === numericId
         );
 
-        if (globe) {
-            globe
-                .polygonCapColor(function (item) {
-                    return item === selectedCountry
-                        ? "rgba(255, 199, 110, 0.85)"
-                        : "rgba(180, 119, 53, 0.22)";
-                });
-        }
-    }
+        feature.properties = {
+          ...(feature.properties || {}),
+          iso3: countryMap.get(numericId) || null,
+          name: matchingCountry?.name?.common ||
+                feature.properties?.name ||
+                "Unknown territory"
+        };
 
+        return feature;
+      });
 
-    /* =====================================================
-       GLOBE INITIALIZATION
-    ===================================================== */
+      container.innerHTML = "";
 
-    async function init() {
-        const container = document.getElementById("globe-container");
-
-        if (!container) return;
-
-        if (globe) return;
-
-        try {
-            if (typeof window.Globe !== "function") {
-                throw new Error("Globe.gl library is not available.");
-            }
-
-            if (!window.topojson) {
-                throw new Error("TopoJSON library is not available.");
-            }
-
-            container.innerHTML = "";
-
-            await loadCountryIndex();
-
-            polygons = await loadPolygons();
-
-            globe = window.Globe({
-                animateIn: true,
-                waitForGlobeReady: true
-            })(container)
-
-                .backgroundColor(CONFIG.backgroundColor)
-
-                .globeImageUrl(CONFIG.earthTexture)
-
-                .showAtmosphere(true)
-
-                .atmosphereColor("#b37b43")
-
-                .atmosphereAltitude(0.18)
-
-                .polygonsData(polygons)
-
-                .polygonCapColor(function (feature) {
-                    return feature === selectedCountry
-                        ? "rgba(255, 199, 110, 0.85)"
-                        : "rgba(180, 119, 53, 0.20)";
-                })
-
-                .polygonSideColor(() => "rgba(90, 56, 27, 0.30)")
-
-                .polygonStrokeColor(() => "rgba(237, 191, 125, 0.38)")
-
-                .polygonAltitude(function (feature) {
-                    return feature === selectedCountry
-                        ? 0.018
-                        : 0.004;
-                })
-
-                .polygonLabel(function (feature) {
-                    const properties = feature.properties || {};
-
-                    return `
-                        <div style="
-                            background:#11141b;
-                            color:#f1e5d0;
-                            border:1px solid #d7a45e;
-                            border-radius:7px;
-                            padding:9px 12px;
-                            font-family:Arial,sans-serif;
-                        ">
-                            <strong style="color:#f1c47d">
-                                ${escapeHTML(properties.name || "Unknown")}
-                            </strong>
-                            <br>
-                            <small>
-                                Click to view country information
-                            </small>
-                        </div>
-                    `;
-                })
-
-                .onPolygonClick(function (feature) {
-                    selectCountry(feature);
-                });
-
-            const controls = globe.controls();
-
-            controls.autoRotate = true;
-            controls.autoRotateSpeed = CONFIG.autoRotateSpeed;
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.08;
-            controls.minDistance = 150;
-            controls.maxDistance = 600;
-
-            globe.pointOfView(
-                {
-                    lat: 25,
-                    lng: 15,
-                    altitude: CONFIG.initialAltitude
-                },
-                1000
-            );
-
-            autoRotate = true;
-
-            installControls();
-            observeSize();
-
-            const loading = container.querySelector(".globe-loading");
-
-            if (loading) {
-                loading.remove();
-            }
-
-            window.dispatchEvent(
-                new CustomEvent("archive:globe-ready")
-            );
-
-        } catch (error) {
-            console.error("[ArchiveGlobe]", error);
-
-            container.innerHTML = `
-                <div class="globe-loading">
-                    <div>
-                        <strong>Globe unavailable</strong>
-                        <p style="margin-top:8px;color:#92939a">
-                            ${escapeHTML(error.message)}
-                        </p>
-                        <button
-                            id="retryGlobe"
-                            style="
-                                margin-top:14px;
-                                padding:9px 15px;
-                                background:#d7a45e;
-                                color:#111;
-                                border:0;
-                                border-radius:6px;
-                                cursor:pointer;
-                            "
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            const retry = document.getElementById("retryGlobe");
-
-            if (retry) {
-                retry.addEventListener("click", function () {
-                    globe = null;
-                    init();
-                });
-            }
-        }
-    }
-
-
-    function escapeHTML(value) {
-        return String(value).replace(/[&<>"']/g, function (char) {
-            const entities = {
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#039;"
-            };
-
-            return entities[char];
+      globe = Globe()(container)
+        .width(container.clientWidth)
+        .height(container.clientHeight || 560)
+        .backgroundColor("#10100f")
+        .showAtmosphere(true)
+        .atmosphereColor("#b79a5b")
+        .atmosphereAltitude(0.13)
+        .globeImageUrl(
+          "https://unpkg.com/three-globe/example/img/earth-night.jpg"
+        )
+        .bumpImageUrl(
+          "https://unpkg.com/three-globe/example/img/earth-topology.png"
+        )
+        .polygonsData(countryFeatures)
+        .polygonCapColor(polygonColor)
+        .polygonSideColor(() => "rgba(30, 27, 21, 0.8)")
+        .polygonStrokeColor(() => "rgba(204, 177, 119, 0.45)")
+        .polygonAltitude(polygonAltitude)
+        .polygonLabel(feature => {
+          const name = feature.properties?.name || "Unknown";
+          return `<div class="globe-tooltip">${name}</div>`;
+        })
+        .onPolygonHover(feature => {
+          if (globe) {
+            globe.polygonCapColor(item => {
+              if (item === selectedFeature) {
+                return "rgba(224, 190, 112, 0.82)";
+              }
+              return item === feature
+                ? "rgba(224, 190, 112, 0.48)"
+                : "rgba(180, 160, 118, 0.16)";
+            });
+          }
+        })
+        .onPolygonClick(feature => {
+          setSelected(feature);
         });
-    }
 
+      globe.controls().autoRotate = true;
+      globe.controls().autoRotateSpeed = 0.28;
+      globe.controls().enableDamping = true;
+      globe.controls().dampingFactor = 0.08;
+      globe.pointOfView({ lat: 18, lng: 8, altitude: 2.25 }, 1200);
 
-    /* =====================================================
-       CONTROLS
-    ===================================================== */
+      const zoomIn = document.getElementById("globeZoomIn");
+      const zoomOut = document.getElementById("globeZoomOut");
+      const reset = document.getElementById("globeReset");
 
-    function installControls() {
-        const zoomIn = document.getElementById("globeZoomIn");
-        const zoomOut = document.getElementById("globeZoomOut");
-        const reset = document.getElementById("globeReset");
-        const rotate = document.getElementById("globeAutoRotate");
-
-        if (zoomIn) {
-            zoomIn.addEventListener("click", function () {
-                zoom(-0.45);
-            });
-        }
-
-        if (zoomOut) {
-            zoom(0.45);
-        }
-
-        if (zoomOut) {
-            zoomOut.addEventListener("click", function () {
-                zoom(0.45);
-            });
-        }
-
-        if (reset) {
-            reset.addEventListener("click", function () {
-                if (!globe) return;
-
-                globe.pointOfView(
-                    {
-                        lat: 25,
-                        lng: 15,
-                        altitude: CONFIG.initialAltitude
-                    },
-                    900
-                );
-            });
-        }
-
-        if (rotate) {
-            rotate.addEventListener("click", toggleRotation);
-        }
-    }
-
-
-    function zoom(amount) {
-        if (!globe) return;
-
-        const current = globe.pointOfView();
-
-        const nextAltitude = Math.max(
-            CONFIG.minimumAltitude,
-            Math.min(
-                CONFIG.maximumAltitude,
-                current.altitude + amount
-            )
-        );
-
+      zoomIn?.addEventListener("click", () => {
+        const view = globe.pointOfView();
         globe.pointOfView(
-            {
-                ...current,
-                altitude: nextAltitude
-            },
-            350
+          { ...view, altitude: Math.max(0.8, view.altitude * 0.78) },
+          350
         );
+      });
+
+      zoomOut?.addEventListener("click", () => {
+        const view = globe.pointOfView();
+        globe.pointOfView(
+          { ...view, altitude: Math.min(5, view.altitude * 1.28) },
+          350
+        );
+      });
+
+      reset?.addEventListener("click", () => {
+        setSelected(null);
+        globe.pointOfView({ lat: 18, lng: 8, altitude: 2.25 }, 800);
+      });
+
+      resizeObserver = new ResizeObserver(() => {
+        if (!globe || !container) return;
+        globe.width(container.clientWidth);
+        globe.height(container.clientHeight || 560);
+      });
+
+      resizeObserver.observe(container);
+
+      window.dispatchEvent(new CustomEvent("archive:globe-ready"));
+    } catch (error) {
+      console.error("Globe initialisation failed:", error);
+      container.innerHTML =
+        '<div class="globe-loading">The geographical atlas could not be loaded. Please check your connection and refresh the page.</div>';
     }
+  }
 
-
-    function toggleRotation() {
-        if (!globe) return;
-
-        autoRotate = !autoRotate;
-
-        globe.controls().autoRotate = autoRotate;
-
-        const button = document.getElementById("globeAutoRotate");
-
-        if (button) {
-            button.classList.toggle("active", autoRotate);
-        }
-    }
-
-
-    /* =====================================================
-       RESIZE
-    ===================================================== */
-
-    function observeSize() {
-        const container = document.getElementById("globe-container");
-
-        if (!container || !globe) return;
-
-        if (resizeObserver) {
-            resizeObserver.disconnect();
-        }
-
-        resizeObserver = new ResizeObserver(function () {
-            if (!globe) return;
-
-            globe.width(container.clientWidth);
-            globe.height(container.clientHeight);
-        });
-
-        resizeObserver.observe(container);
-    }
-
-
-    /* =====================================================
-       PUBLIC API
-    ===================================================== */
-
-    window.ArchiveGlobe = Object.freeze({
-        init: init,
-        selectCountry: selectCountry,
-        toggleRotation: toggleRotation,
-        zoom: zoom,
-
-        getSelectedCountry: function () {
-            return selectedCountry
-                ? selectedCountry.properties
-                : null;
-        },
-
-        getGlobe: function () {
-            return globe;
-        }
-    });
-
+  document.addEventListener("DOMContentLoaded", initialiseGlobe);
 })();
