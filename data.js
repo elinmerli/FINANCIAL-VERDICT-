@@ -1,575 +1,411 @@
-/* THE MONETARY ARCHIVE — public-data engine. No API keys. */
 
 (() => {
   "use strict";
 
   const API = {
     nbp: "https://api.nbp.pl/api",
-    wb: "https://api.worldbank.org/v2",
-    coin: "https://api.coingecko.com/api/v3"
+    bitcoin: "https://api.coingecko.com/api/v3",
+    worldBank: "https://api.worldbank.org/v2",
+    binance: "https://api.binance.com/api/v3",
+    coinbase: "https://api.exchange.coinbase.com",
+    kraken: "https://api.kraken.com/0/public"
   };
 
-  const COUNTRIES = {
-    US: { name: "United States", wb: "USA", currency: "USD", exchanges: ["New York Stock Exchange (NYSE)", "NASDAQ"] },
-    GB: { name: "United Kingdom", wb: "GBR", currency: "GBP", exchanges: ["London Stock Exchange"] },
-    JP: { name: "Japan", wb: "JPN", currency: "JPY", exchanges: ["Tokyo Stock Exchange"] },
-    DE: { name: "Germany", wb: "DEU", currency: "EUR", exchanges: ["Frankfurt Stock Exchange · Xetra"] },
-    FR: { name: "France", wb: "FRA", currency: "EUR", exchanges: ["Euronext Paris"] },
-    CN: { name: "China", wb: "CHN", currency: "CNY", exchanges: ["Shanghai Stock Exchange", "Shenzhen Stock Exchange"] },
-    IN: { name: "India", wb: "IND", currency: "INR", exchanges: ["National Stock Exchange of India", "BSE"] },
-    CA: { name: "Canada", wb: "CAN", currency: "CAD", exchanges: ["Toronto Stock Exchange"] },
-    AU: { name: "Australia", wb: "AUS", currency: "AUD", exchanges: ["Australian Securities Exchange"] },
-    CH: { name: "Switzerland", wb: "CHE", currency: "CHF", exchanges: ["SIX Swiss Exchange"] },
-    BR: { name: "Brazil", wb: "BRA", currency: "BRL", exchanges: ["B3"] },
-    PL: { name: "Poland", wb: "POL", currency: "PLN", exchanges: ["Warsaw Stock Exchange"] },
-    KR: { name: "South Korea", wb: "KOR", currency: "KRW", exchanges: ["Korea Exchange"] },
-    SG: { name: "Singapore", wb: "SGP", currency: "SGD", exchanges: ["Singapore Exchange"] },
-    MX: { name: "Mexico", wb: "MEX", currency: "MXN", exchanges: ["Bolsa Mexicana de Valores"] },
-    ZA: { name: "South Africa", wb: "ZAF", currency: "ZAR", exchanges: ["Johannesburg Stock Exchange"] },
-    SE: { name: "Sweden", wb: "SWE", currency: "SEK", exchanges: ["Nasdaq Stockholm"] },
-    NO: { name: "Norway", wb: "NOR", currency: "NOK", exchanges: ["Oslo Børs"] },
-    DK: { name: "Denmark", wb: "DNK", currency: "DKK", exchanges: ["Nasdaq Copenhagen"] },
-    CZ: { name: "Czechia", wb: "CZE", currency: "CZK", exchanges: ["Prague Stock Exchange"] },
-    HU: { name: "Hungary", wb: "HUN", currency: "HUF", exchanges: ["Budapest Stock Exchange"] },
-    TR: { name: "Türkiye", wb: "TUR", currency: "TRY", exchanges: ["Borsa Istanbul"] },
-    ID: { name: "Indonesia", wb: "IDN", currency: "IDR", exchanges: ["Indonesia Stock Exchange"] },
-    TH: { name: "Thailand", wb: "THA", currency: "THB", exchanges: ["Stock Exchange of Thailand"] },
-    NZ: { name: "New Zealand", wb: "NZL", currency: "NZD", exchanges: ["New Zealand Exchange"] },
-    AR: { name: "Argentina", wb: "ARG", currency: "ARS", exchanges: ["BYMA"] },
-    NG: { name: "Nigeria", wb: "NGA", currency: "NGN", exchanges: ["Nigerian Exchange"] },
-    EG: { name: "Egypt", wb: "EGY", currency: "EGP", exchanges: ["Egyptian Exchange"] },
-    RU: { name: "Russian Federation", wb: "RUS", currency: "RUB", exchanges: ["Moscow Exchange"] },
-    UA: { name: "Ukraine", wb: "UKR", currency: "UAH", exchanges: ["PFTS / Ukrainian Exchange"] }
-  };
+  const CACHE_PREFIX = "monetary_archive_v2_";
+  const CACHE_TIME = 5 * 60 * 1000;
 
-  const CURRENCIES = [
-    "USD", "EUR", "GBP", "CHF", "JPY", "CAD", "AUD",
-    "CNY", "INR", "BRL", "PLN", "SEK", "NOK", "DKK",
-    "CZK", "HUF", "KRW", "SGD", "MXN", "ZAR", "TRY",
-    "IDR", "THB", "NZD", "ARS", "NGN", "EGP", "RUB", "UAH"
+  const currencies = [
+    ["USD", "US Dollar"], ["EUR", "Euro"], ["GBP", "British Pound"],
+    ["CHF", "Swiss Franc"], ["JPY", "Japanese Yen"], ["PLN", "Polish Zloty"],
+    ["CAD", "Canadian Dollar"], ["AUD", "Australian Dollar"],
+    ["CNY", "Chinese Yuan"], ["INR", "Indian Rupee"], ["SEK", "Swedish Krona"],
+    ["NOK", "Norwegian Krone"], ["DKK", "Danish Krone"],
+    ["CZK", "Czech Koruna"], ["HUF", "Hungarian Forint"],
+    ["BRL", "Brazilian Real"], ["MXN", "Mexican Peso"],
+    ["SGD", "Singapore Dollar"], ["HKD", "Hong Kong Dollar"],
+    ["TRY", "Turkish Lira"], ["ZAR", "South African Rand"]
+  ].map(([code, name]) => ({ code, name }));
+
+  const countries = [
+    { code:"US", name:"United States", iso:"840", currency:"USD", wb:"USA" },
+    { code:"GB", name:"United Kingdom", iso:"826", currency:"GBP", wb:"GBR" },
+    { code:"JP", name:"Japan", iso:"392", currency:"JPY", wb:"JPN" },
+    { code:"PL", name:"Poland", iso:"616", currency:"PLN", wb:"POL" },
+    { code:"DE", name:"Germany", iso:"276", currency:"EUR", wb:"DEU" },
+    { code:"FR", name:"France", iso:"250", currency:"EUR", wb:"FRA" },
+    { code:"IT", name:"Italy", iso:"380", currency:"EUR", wb:"ITA" },
+    { code:"ES", name:"Spain", iso:"724", currency:"EUR", wb:"ESP" },
+    { code:"CH", name:"Switzerland", iso:"756", currency:"CHF", wb:"CHE" },
+    { code:"CA", name:"Canada", iso:"124", currency:"CAD", wb:"CAN" },
+    { code:"AU", name:"Australia", iso:"036", currency:"AUD", wb:"AUS" },
+    { code:"CN", name:"China", iso:"156", currency:"CNY", wb:"CHN" },
+    { code:"IN", name:"India", iso:"356", currency:"INR", wb:"IND" },
+    { code:"BR", name:"Brazil", iso:"076", currency:"BRL", wb:"BRA" },
+    { code:"SE", name:"Sweden", iso:"752", currency:"SEK", wb:"SWE" },
+    { code:"NO", name:"Norway", iso:"578", currency:"NOK", wb:"NOR" },
+    { code:"DK", name:"Denmark", iso:"208", currency:"DKK", wb:"DNK" },
+    { code:"CZ", name:"Czechia", iso:"203", currency:"CZK", wb:"CZE" },
+    { code:"HU", name:"Hungary", iso:"348", currency:"HUF", wb:"HUN" },
+    { code:"RU", name:"Russia", iso:"643", currency:"RUB", wb:"RUS" },
+    { code:"KR", name:"South Korea", iso:"410", currency:"KRW", wb:"KOR" },
+    { code:"MX", name:"Mexico", iso:"484", currency:"MXN", wb:"MEX" },
+    { code:"SG", name:"Singapore", iso:"702", currency:"SGD", wb:"SGP" },
+    { code:"TR", name:"Türkiye", iso:"792", currency:"TRY", wb:"TUR" },
+    { code:"ZA", name:"South Africa", iso:"710", currency:"ZAR", wb:"ZAF" },
+    { code:"NL", name:"Netherlands", iso:"528", currency:"EUR", wb:"NLD" },
+    { code:"BE", name:"Belgium", iso:"056", currency:"EUR", wb:"BEL" },
+    { code:"AT", name:"Austria", iso:"040", currency:"EUR", wb:"AUT" },
+    { code:"IE", name:"Ireland", iso:"372", currency:"EUR", wb:"IRL" },
+    { code:"PT", name:"Portugal", iso:"620", currency:"EUR", wb:"PRT" }
   ];
 
-  const cache = new Map();
+  const stockExchanges = [
+    { name:"Nasdaq", country:"United States", city:"New York", code:"NASDAQ", index:"Nasdaq Composite", symbol:"^IXIC", description:"Technology-heavy US stock exchange." },
+    { name:"New York Stock Exchange", country:"United States", city:"New York", code:"NYSE", index:"S&P 500", symbol:"^GSPC", description:"One of the world's major equity exchanges." },
+    { name:"London Stock Exchange", country:"United Kingdom", city:"London", code:"LSE", index:"FTSE 100", symbol:"^FTSE", description:"Major UK and international listing venue." },
+    { name:"Tokyo Stock Exchange", country:"Japan", city:"Tokyo", code:"TSE", index:"Nikkei 225", symbol:"^N225", description:"Japan's principal stock exchange." },
+    { name:"Euronext", country:"Europe", city:"Amsterdam / Paris", code:"ENX", index:"Euronext 100", symbol:"", description:"Pan-European exchange group." },
+    { name:"Shanghai Stock Exchange", country:"China", city:"Shanghai", code:"SSE", index:"SSE Composite", symbol:"000001.SS", description:"Major mainland Chinese stock exchange." },
+    { name:"Hong Kong Exchanges", country:"Hong Kong", city:"Hong Kong", code:"HKEX", index:"Hang Seng", symbol:"^HSI", description:"International financial market in Hong Kong." },
+    { name:"Deutsche Börse", country:"Germany", city:"Frankfurt", code:"DB", index:"DAX", symbol:"^GDAXI", description:"German exchange group." }
+  ];
+
+  const cryptoExchanges = [
+    { name:"Binance", code:"BINANCE", url:"https://www.binance.com", description:"Global cryptocurrency trading venue." },
+    { name:"Coinbase Exchange", code:"COINBASE", url:"https://www.coinbase.com/exchange", description:"US-based cryptocurrency exchange." },
+    { name:"Kraken", code:"KRAKEN", url:"https://www.kraken.com", description:"Digital asset exchange with public market endpoints." }
+  ];
 
   let dashboard = null;
-  let loading = null;
-  let lastSuccess = null;
+  let fx = { PLN: 1 };
+  let fxDate = null;
+  let lastErrors = {};
+  let historyCache = {};
 
-  async function getJSON(url, ttl = 300000) {
-    const cached = cache.get(url);
+  function cached(key) {
+    try {
+      const item = JSON.parse(localStorage.getItem(CACHE_PREFIX + key) || "null");
+      if (item && Date.now() - item.time < CACHE_TIME) return item.value;
+    } catch (_) {}
+    return null;
+  }
 
-    if (cached && Date.now() - cached.at < ttl) {
-      return cached.data;
-    }
+  function store(key, value) {
+    try {
+      localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ time: Date.now(), value }));
+    } catch (_) {}
+  }
 
+  async function fetchJSON(url, options = {}, timeout = 12000) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 16000);
-
+    const timer = setTimeout(() => controller.abort(), timeout);
     try {
       const response = await fetch(url, {
+        ...options,
         signal: controller.signal,
-        headers: {
-          Accept: "application/json"
-        },
-        cache: "no-store"
+        headers: { Accept: "application/json", ...(options.headers || {}) }
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      cache.set(url, {
-        at: Date.now(),
-        data
-      });
-
-      return data;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
     } finally {
       clearTimeout(timer);
     }
   }
 
-  const num = value => {
-    if (value === null || value === undefined || value === "") {
-      return null;
-    }
-
-    return Number.isFinite(Number(value))
-      ? Number(value)
-      : null;
-  };
-
-  /* NATIONAL BANK OF POLAND */
-
-  async function nbp() {
-    const [tableResult, goldResult] = await Promise.allSettled([
-      getJSON(`${API.nbp}/exchangerates/tables/a/?format=json`),
-      getJSON(`${API.nbp}/cenyzlota/last/1/?format=json`)
-    ]);
-
-    if (
-      tableResult.status !== "fulfilled" ||
-      !tableResult.value?.[0]?.rates
-    ) {
-      throw new Error("NBP rate table unavailable");
-    }
-
-    const table = tableResult.value[0];
-
-    const gold = goldResult.status === "fulfilled"
-      ? goldResult.value
-      : null;
-
-    const plnPerUnit = {
-      PLN: 1
-    };
-
-    for (const item of table.rates) {
-      plnPerUnit[item.code] = num(item.mid);
-    }
-
-    return {
-      plnPerUnit,
-      tableDate: table.effectiveDate,
-      tableNo: table.no,
-
-      goldPLNPerGram: num(gold?.[0]?.cena),
-      goldDate: gold?.[0]?.data,
-
-      rates: table.rates.map(item => ({
-        code: item.code,
-        name: item.currency,
-        pln: num(item.mid)
-      })),
-
-      goldError: goldResult.status === "rejected"
-        ? goldResult.reason.message
-        : null
-    };
+  async function cachedRequest(key, url, maxAge = CACHE_TIME) {
+    const old = cached(key);
+    if (old) return old;
+    const value = await fetchJSON(url);
+    store(key, value);
+    return value;
   }
 
-  /* COINGECKO */
+  async function loadFX() {
+    const old = cached("fx");
+    try {
+      const data = await fetchJSON(`${API.nbp}/exchangerates/tables/A?format=json`);
+      const table = data?.[0];
+      if (!table?.rates) throw new Error("NBP returned no rates");
 
-  async function bitcoin() {
-    const [spotResult, historyResult] = await Promise.allSettled([
-      getJSON(
-        `${API.coin}/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true&include_last_updated_at=true`,
-        120000
-      ),
-
-      getJSON(
-        `${API.coin}/coins/bitcoin/market_chart?vs_currency=usd&days=30&interval=daily`,
-        600000
-      )
-    ]);
-
-    if (spotResult.status !== "fulfilled") {
-      throw spotResult.reason;
-    }
-
-    const bitcoinData = spotResult.value.bitcoin;
-
-    if (!bitcoinData || !Number.isFinite(bitcoinData.usd)) {
-      throw new Error("Bitcoin price unavailable");
-    }
-
-    const history = historyResult.status === "fulfilled"
-      ? historyResult.value
-      : null;
-
-    return {
-      usd: bitcoinData.usd,
-
-      change24h: num(bitcoinData.usd_24h_change),
-
-      marketCapUsd: num(bitcoinData.usd_market_cap),
-
-      volume24hUsd: num(bitcoinData.usd_24h_vol),
-
-      updatedAt: bitcoinData.last_updated_at
-        ? new Date(bitcoinData.last_updated_at * 1000).toISOString()
-        : new Date().toISOString(),
-
-      history: (history?.prices || [])
-        .map(item => ({
-          time: item[0],
-          value: num(item[1])
-        }))
-        .filter(item => item.value !== null),
-
-      historyError: historyResult.status === "rejected"
-        ? historyResult.reason.message
-        : null
-    };
-  }
-
-  /* WORLD BANK */
-
-  const wbToIso = Object.fromEntries(
-    Object.entries(COUNTRIES).map(([iso, country]) => [
-      country.wb,
-      iso
-    ])
-  );
-
-  async function wbIndicator(iso, indicator) {
-    const country = COUNTRIES[iso];
-
-    if (!country) {
-      throw new Error("Country profile is not configured");
-    }
-
-    const url =
-      `${API.wb}/country/${country.wb}/indicator/${indicator}?format=json&per_page=5`;
-
-    const data = await getJSON(url, 3600000);
-
-    return (data?.[1] || [])
-      .filter(item => item.value !== null)
-      .map(item => ({
-        country: iso,
-        countryName: country.name,
-        indicator,
-        indicatorName: item.indicator?.value || indicator,
-        value: num(item.value),
-        year: String(item.date),
-        date: String(item.date),
-        unit: "%",
-        source: "World Bank"
-      }))
-      .filter(item => item.value !== null)
-      .sort((a, b) => b.year - a.year);
-  }
-
-  async function economics() {
-    const codes = {
-      inflation: "FP.CPI.TOTL.ZG",
-      gdp: "NY.GDP.MKTP.KD.ZG",
-      unemployment: "SL.UEM.TOTL.ZS"
-    };
-
-    const countryList = Object.values(COUNTRIES)
-      .map(country => country.wb)
-      .join(";");
-
-    const jobs = Object.entries(codes);
-
-    const results = await Promise.allSettled(
-      jobs.map(([kind, indicator]) =>
-        getJSON(
-          `${API.wb}/country/${countryList}/indicator/${indicator}?format=json&per_page=2000`,
-          3600000
-        )
-      )
-    );
-
-    const records = [];
-    const failures = [];
-
-    results.forEach((result, index) => {
-      const [kind, indicator] = jobs[index];
-
-      if (result.status !== "fulfilled") {
-        failures.push(
-          `${kind}: ${result.reason?.message || "unavailable"}`
-        );
-        return;
-      }
-
-      const rows = result.value?.[1] || [];
-
-      for (const item of rows) {
-        if (item.value === null) {
-          continue;
+      const next = { PLN: 1 };
+      for (const rate of table.rates) {
+        if (rate.code && Number.isFinite(Number(rate.mid)) && Number(rate.mid) > 0) {
+          next[rate.code] = Number(rate.mid);
         }
-
-        const iso = wbToIso[item.country?.id];
-
-        if (!iso) {
-          continue;
-        }
-
-        records.push({
-          country: iso,
-          countryName: COUNTRIES[iso].name,
-          indicator,
-          indicatorName: item.indicator?.value || indicator,
-          value: num(item.value),
-          year: String(item.date),
-          date: String(item.date),
-          unit: "%",
-          source: "World Bank",
-          kind
-        });
       }
-    });
-
-    return {
-      records: records.filter(item => item.value !== null),
-      failures
-    };
+      fx = next;
+      fxDate = table.effectiveDate;
+      store("fx", { rates: fx, date: fxDate });
+      lastErrors.fx = null;
+      return { rates: fx, date: fxDate, stale: false };
+    } catch (error) {
+      const saved = old || cached("fx");
+      if (saved?.rates) {
+        fx = saved.rates;
+        fxDate = saved.date;
+      }
+      lastErrors.fx = error.message;
+      if (fxDate) return { rates: fx, date: fxDate, stale: true, error: error.message };
+      throw error;
+    }
   }
 
-  /* MAIN DASHBOARD */
-
-  async function loadDashboard(force = false) {
-    if (loading) {
-      return loading;
+  async function loadGold() {
+    const old = cached("gold");
+    try {
+      const data = await fetchJSON(`${API.nbp}/cenyzlota/?format=json`);
+      const row = data?.[0];
+      if (!row || !Number.isFinite(Number(row.cena))) throw new Error("Gold price unavailable");
+      const result = { plnPerGram: Number(row.cena), date: row.data };
+      store("gold", result);
+      lastErrors.gold = null;
+      return result;
+    } catch (error) {
+      lastErrors.gold = error.message;
+      if (old) return { ...old, stale: true };
+      throw error;
     }
+  }
 
-    if (
-      !force &&
-      dashboard &&
-      Date.now() - dashboard.checkedAt < 300000
-    ) {
-      return dashboard;
-    }
-
-    loading = (async () => {
-      const [fx, btc, econ] = await Promise.allSettled([
-        nbp(),
-        bitcoin(),
-        economics()
-      ]);
-
-      const data = {
-        checkedAt: Date.now(),
-        generatedAt: new Date().toISOString(),
-
-        fx: fx.status === "fulfilled"
-          ? fx.value
-          : null,
-
-        bitcoin: btc.status === "fulfilled"
-          ? btc.value
-          : null,
-
-        economy: econ.status === "fulfilled"
-          ? econ.value.records
-          : [],
-
-        errors: {
-          fx: fx.status === "rejected"
-            ? fx.reason.message
-            : null,
-
-          bitcoin: btc.status === "rejected"
-            ? btc.reason.message
-            : null,
-
-          economy: econ.status === "rejected"
-            ? econ.reason.message
-            : null
-        },
-
-        sources: [
-          {
-            name: "National Bank of Poland",
-            status: fx.status === "fulfilled" ? "online" : "error",
-            date: fx.status === "fulfilled"
-              ? fx.value.tableDate
-              : null,
-            error: fx.status === "rejected"
-              ? fx.reason.message
-              : null
-          },
-
-          {
-            name: "CoinGecko",
-            status: btc.status === "fulfilled" ? "online" : "error",
-            date: btc.status === "fulfilled"
-              ? btc.value.updatedAt
-              : null,
-            error: btc.status === "rejected"
-              ? btc.reason.message
-              : null
-          },
-
-          {
-            name: "World Bank",
-            status: econ.status === "fulfilled" ? "online" : "error",
-            date: null,
-            error: econ.status === "rejected"
-              ? econ.reason.message
-              : null
-          }
-        ]
+  async function loadBitcoin(currency = "usd") {
+    const key = "btc_" + currency;
+    const old = cached(key);
+    try {
+      const data = await fetchJSON(
+        `${API.bitcoin}/simple/price?ids=bitcoin&vs_currencies=${encodeURIComponent(currency)}&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`
+      );
+      const btc = data?.bitcoin;
+      if (!btc || !Number.isFinite(Number(btc[currency]))) throw new Error("Bitcoin data unavailable");
+      const result = {
+        price: Number(btc[currency]),
+        change: Number(btc[currency + "_24h_change"]),
+        marketCap: Number(btc[currency + "_market_cap"]),
+        volume: Number(btc[currency + "_24h_vol"]),
+        currency: currency.toUpperCase(),
+        updatedAt: new Date().toISOString()
       };
-
-      if (
-        !data.fx &&
-        !data.bitcoin &&
-        !data.economy.length &&
-        lastSuccess
-      ) {
-        return lastSuccess;
-      }
-
-      dashboard = data;
-
-      if (data.fx || data.bitcoin || data.economy.length) {
-        lastSuccess = data;
-      }
-
-      return data;
-    })().finally(() => {
-      loading = null;
-    });
-
-    return loading;
-  }
-
-  /* CURRENCY CONVERSION */
-
-  function rate(currency, fx = dashboard?.fx) {
-    if (currency === "PLN") {
-      return 1;
+      store(key, result);
+      lastErrors.bitcoin = null;
+      return result;
+    } catch (error) {
+      lastErrors.bitcoin = error.message;
+      if (old) return { ...old, stale: true };
+      throw error;
     }
-
-    return fx?.plnPerUnit?.[currency] ?? null;
   }
 
-  function convert(amount, from, to, fx = dashboard?.fx) {
-    const value = num(amount);
-    const fromRate = rate(from, fx);
-    const toRate = rate(to, fx);
+  async function loadBitcoinHistory(days = 7, currency = "usd") {
+    const key = `btc_history_${days}_${currency}`;
+    if (historyCache[key]) return historyCache[key];
+    try {
+      const data = await fetchJSON(
+        `${API.bitcoin}/coins/bitcoin/market_chart?vs_currency=${encodeURIComponent(currency.toLowerCase())}&days=${days}`
+      );
+      if (!Array.isArray(data.prices)) throw new Error("No historical prices");
+      const result = data.prices.map(([time, price]) => ({
+        date: new Date(time),
+        value: Number(price)
+      }));
+      historyCache[key] = result;
+      return result;
+    } catch (error) {
+      lastErrors.bitcoinHistory = error.message;
+      const saved = cached(key);
+      if (saved) return saved;
+      throw error;
+    }
+  }
 
-    if (
-      value === null ||
-      fromRate === null ||
-      toRate === null ||
-      toRate === 0
-    ) {
+  async function loadWorldBank(countryCode, indicator) {
+    const key = `wb_${countryCode}_${indicator}`;
+    try {
+      const data = await cachedRequest(
+        key,
+        `${API.worldBank}/country/${countryCode}/indicator/${indicator}?format=json&per_page=30`
+      );
+      const observations = data?.[1] || [];
+      const row = observations.find(item => item.value !== null);
+      if (!row) return null;
+      return {
+        value: Number(row.value),
+        year: row.date,
+        country: row.country?.value || countryCode,
+        indicator: row.indicator?.value || indicator,
+        source: "World Bank"
+      };
+    } catch (error) {
+      lastErrors[key] = error.message;
       return null;
     }
+  }
 
-    return value * fromRate / toRate;
+  async function loadEconomy(indicator = "NY.GDP.MKTP.KD.ZG") {
+    const results = await Promise.all(countries.map(async country => {
+      const record = await loadWorldBank(country.wb, indicator);
+      return record ? { ...record, code: country.code, country: country.name } : null;
+    }));
+    return results.filter(Boolean).sort((a, b) => a.country.localeCompare(b.country));
+  }
+
+  async function loadCountryData(code) {
+    const country = countries.find(item => item.code === code || item.iso === String(code));
+    if (!country) return null;
+
+    const indicators = await Promise.all([
+      loadWorldBank(country.wb, "NY.GDP.MKTP.KD.ZG"),
+      loadWorldBank(country.wb, "FP.CPI.TOTL.ZG"),
+      loadWorldBank(country.wb, "SL.UEM.TOTL.ZS"),
+      loadWorldBank(country.wb, "NY.GDP.MKTP.CD")
+    ]);
+
+    return {
+      ...country,
+      gdpGrowth: indicators[0],
+      inflation: indicators[1],
+      unemployment: indicators[2],
+      gdp: indicators[3],
+      currencyRate: country.currency === "PLN" ? 1 : fx[country.currency] || null,
+      currencyBase: "PLN",
+      observationNote: "World Bank indicators may refer to different observation years."
+    };
+  }
+
+  function convert(amount, from, to) {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value < 0) return null;
+    if (!fx[from] || !fx[to]) return null;
+    return value * fx[from] / fx[to];
   }
 
   function format(value, currency = "USD", digits = 2) {
-    if (!Number.isFinite(value)) {
-      return "—";
-    }
-
+    if (!Number.isFinite(Number(value))) return "Unavailable";
     try {
       return new Intl.NumberFormat("en-US", {
         style: "currency",
         currency,
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits
-      }).format(value);
-    } catch {
-      return `${value.toFixed(digits)} ${currency}`;
+        maximumFractionDigits: digits,
+        minimumFractionDigits: digits
+      }).format(Number(value));
+    } catch (_) {
+      return `${Number(value).toFixed(digits)} ${currency}`;
     }
   }
 
-  /* GOLD */
-
-  function goldIn(currency, fx = dashboard?.fx) {
-    if (!fx || !Number.isFinite(fx.goldPLNPerGram)) {
-      return null;
-    }
-
-    const perGram = convert(
-      fx.goldPLNPerGram,
-      "PLN",
-      currency,
-      fx
-    );
-
-    return perGram === null
-      ? null
-      : perGram * 31.1034768;
+  function goldIn(currency = "USD", gold) {
+    const source = gold || dashboard?.gold;
+    if (!source || !fx[currency]) return null;
+    return source.plnPerGram / fx[currency];
   }
 
-  /* COUNTRY DATA */
-
-  function getCountry(code) {
-    return COUNTRIES[code] || null;
-  }
-
-  async function getCountryData(code) {
-    const country = getCountry(code);
-
-    if (!country) {
-      throw new Error("Country profile is not configured");
-    }
-
-    const definitions = {
-      "GDP growth": "NY.GDP.MKTP.KD.ZG",
-      "Inflation": "FP.CPI.TOTL.ZG",
-      "Unemployment": "SL.UEM.TOTL.ZS"
-    };
-
-    const results = await Promise.allSettled(
-      Object.entries(definitions).map(([name, indicator]) =>
-        wbIndicator(code, indicator).then(rows => ({
-          name,
-          latest: rows[0] || null,
-          history: rows
-        }))
-      )
-    );
-
+  async function loadBinanceBTC() {
+    const data = await fetchJSON(`${API.binance}/ticker/24hr?symbol=BTCUSDT`);
     return {
-      country,
-
-      indicators: results
-        .filter(result => result.status === "fulfilled")
-        .map(result => result.value),
-
-      errors: results
-        .filter(result => result.status === "rejected")
-        .map(result => result.reason.message)
+      exchange: "Binance",
+      pair: "BTC/USDT",
+      price: Number(data.lastPrice),
+      change: Number(data.priceChangePercent),
+      volume: Number(data.quoteVolume),
+      source: "Binance public API"
     };
   }
 
-  /* BITCOIN HISTORY */
-
-  async function getBitcoinHistory(days = 30) {
-    const safeDays = Math.max(
-      1,
-      Math.min(365, Number(days) || 30)
-    );
-
-    const data = await getJSON(
-      `${API.coin}/coins/bitcoin/market_chart?vs_currency=usd&days=${safeDays}&interval=daily`,
-      600000
-    );
-
-    return (data.prices || [])
-      .map(item => ({
-        time: item[0],
-        value: num(item[1])
-      }))
-      .filter(item => item.value !== null);
+  async function loadCoinbaseBTC() {
+    const data = await fetchJSON(`${API.coinbase}/products/BTC-USD/ticker`);
+    return {
+      exchange: "Coinbase",
+      pair: "BTC/USD",
+      price: Number(data.price),
+      volume: Number(data.volume),
+      source: "Coinbase Exchange public API"
+    };
   }
 
-  /* PUBLIC INTERFACE */
+  async function loadKrakenBTC() {
+    const data = await fetchJSON(`${API.kraken}/Ticker?pair=XBTUSD`);
+    const pair = Object.values(data.result || {})[0];
+    if (!pair) throw new Error("Kraken returned no ticker");
+    return {
+      exchange: "Kraken",
+      pair: "XBT/USD",
+      price: Number(pair.c[0]),
+      volume: Number(pair.v[1]),
+      source: "Kraken public API"
+    };
+  }
 
-  window.ArchiveData = Object.freeze({
+  async function loadCryptoExchanges() {
+    const jobs = [
+      ["Binance", loadBinanceBTC],
+      ["Coinbase", loadCoinbaseBTC],
+      ["Kraken", loadKrakenBTC]
+    ];
+    return Promise.all(jobs.map(async ([name, fn]) => {
+      try {
+        return { ...(await fn()), available: true };
+      } catch (error) {
+        return { exchange: name, available: false, error: error.message };
+      }
+    }));
+  }
+
+  async function loadDashboard(force = false) {
+    if (dashboard && !force) return dashboard;
+
+    const old = cached("dashboard");
+    const tasks = await Promise.allSettled([
+      loadFX(),
+      loadGold(),
+      loadBitcoin("usd"),
+      loadCryptoExchanges()
+    ]);
+
+    const value = {
+      fx: tasks[0].status === "fulfilled" ? tasks[0].value : old?.fx || null,
+      gold: tasks[1].status === "fulfilled" ? tasks[1].value : old?.gold || null,
+      bitcoin: tasks[2].status === "fulfilled" ? tasks[2].value : old?.bitcoin || null,
+      cryptoExchanges: tasks[3].status === "fulfilled" ? tasks[3].value : old?.cryptoExchanges || [],
+      loadedAt: new Date().toISOString(),
+      errors: { ...lastErrors }
+    };
+
+    dashboard = value;
+    if (value.fx || value.gold || value.bitcoin) store("dashboard", value);
+    return value;
+  }
+
+  function getDashboard() { return dashboard; }
+  function getCountry(code) {
+    return countries.find(item => item.code === code || item.iso === String(code)) || null;
+  }
+  function clearCache() {
+    Object.keys(localStorage).filter(key => key.startsWith(CACHE_PREFIX))
+      .forEach(key => localStorage.removeItem(key));
+    dashboard = null;
+    historyCache = {};
+  }
+
+  window.ArchiveData = {
     version: "2.0.0",
-
-    currencies: CURRENCIES,
-    countries: COUNTRIES,
-
+    currencies,
+    countries,
+    stockExchanges,
+    cryptoExchanges,
     loadDashboard,
+    loadFX,
+    loadGold,
+    loadBitcoin,
+    loadBitcoinHistory,
+    loadEconomy,
+    loadCountryData,
+    loadCryptoExchanges,
     convert,
     format,
     goldIn,
-
     getCountry,
-    getCountryData,
-    getBitcoinHistory,
-
-    clearCache() {
-      cache.clear();
-      dashboard = null;
-    },
-
-    getDashboard: () => dashboard
-  });
-
+    getDashboard,
+    clearCache,
+    get fx() { return fx; },
+    get fxDate() { return fxDate; },
+    get errors() { return { ...lastErrors }; }
+  };
 })();
