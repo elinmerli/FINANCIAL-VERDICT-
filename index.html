@@ -1,620 +1,2470 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#090d13">
-<meta name="description" content="The Monetary Archive — global financial and economic data archive.">
-<title>The Monetary Archive — Global Financial Intelligence</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta
+        name="description"
+        content="The Monetary Archive — an international archive of financial records, currencies, markets and economic indicators."
+    >
 
-<link rel="stylesheet" href="styles.css">
+    <meta name="theme-color" content="#090b10">
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3" defer></script>
-<script src="https://unpkg.com/globe.gl@2.41.12/dist/globe.gl.min.js" defer></script>
+    <title>The Monetary Archive</title>
 
-<script src="data.js" defer></script>
-<script src="globe.js" defer></script>
-<script src="script.js" defer></script>
+    <!-- Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- Icons -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js" defer></script>
+    <script src="https://unpkg.com/globe.gl@2.41.12/dist/globe.gl.min.js" defer></script>
+
+    <!-- Project styles -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Project scripts -->
+    <script src="data.js" defer></script>
+    <script src="globe.js" defer></script>
+    <script src="script.js" defer></script>
 </head>
 
 <body>
+
 <div class="app-shell">
 
-<aside class="sidebar" id="sidebar">
-<a class="brand" href="#overview">
-<span class="brand-seal">✥</span>
-<span>
-<b>THE MONETARY<br>ARCHIVE</b>
-<small>GLOBAL FINANCIAL RECORDS</small>
-</span>
-</a>
-
-<nav>
-<p class="nav-heading">THE ARCHIVE</p>
-
-<button class="nav-link active" data-page="overview">⌂ <span>Overview</span></button>
-<button class="nav-link" data-page="globe">◎ <span>Global Globe</span></button>
-<button class="nav-link" data-page="currencies">⇄ <span>Currencies</span></button>
-<button class="nav-link" data-page="markets">▥ <span>Markets & Bitcoin</span></button>
-<button class="nav-link" data-page="inflation">◷ <span>Inflation & Economy</span></button>
-<button class="nav-link" data-page="calculator">∑ <span>Calculators</span></button>
-<button class="nav-link" data-page="archive">▤ <span>Historical Archive</span></button>
-</nav>
-
-<div class="sidebar-note">
-<span>✦</span>
-<b>Knowledge builds wealth.</b>
-<small>An archive of the world's financial records.</small>
-</div>
+    <!-- =========================================
+         HEADER
+    ========================================== -->
+
+    <header class="topbar">
+
+        <div class="brand">
+
+            <div class="brand-emblem">
+                <i class="fa-solid fa-landmark"></i>
+            </div>
+
+            <div class="brand-text">
+                <div class="brand-name">THE MONETARY ARCHIVE</div>
+                <div class="brand-subtitle">
+                    An archive of the world's financial records
+                </div>
+            </div>
+
+        </div>
+
+        <div class="header-tools">
+
+            <div class="global-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+
+                <input
+                    type="search"
+                    id="globalSearch"
+                    placeholder="Search data..."
+                    autocomplete="off"
+                >
+
+                <div
+                    class="search-results"
+                    id="searchResults"
+                    hidden
+                ></div>
+            </div>
+
+            <div class="header-country">
+
+                <i class="fa-solid fa-globe"></i>
+
+                <select id="selectedCountry" aria-label="Selected country">
+                    <option value="PL">Poland</option>
+                    <option value="US">United States</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="DE">Germany</option>
+                    <option value="FR">France</option>
+                    <option value="CH">Switzerland</option>
+                    <option value="JP">Japan</option>
+                    <option value="CN">China</option>
+                    <option value="IN">India</option>
+                    <option value="BR">Brazil</option>
+                    <option value="CA">Canada</option>
+                    <option value="AU">Australia</option>
+                    <option value="IT">Italy</option>
+                    <option value="ES">Spain</option>
+                    <option value="NL">Netherlands</option>
+                    <option value="SE">Sweden</option>
+                    <option value="NO">Norway</option>
+                </select>
+
+            </div>
+
+            <div class="live-indicator" id="connectionStatus">
+                <span class="live-dot"></span>
+                <span id="connectionText">Connecting</span>
+            </div>
+
+            <div class="header-clock">
+                <span id="currentDate">--.--.----</span>
+                <span id="currentTime">--:--:--</span>
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- =========================================
+         MAIN LAYOUT
+    ========================================== -->
+
+    <div class="main-layout">
+
+
+        <!-- =====================================
+             SIDEBAR
+        ====================================== -->
+
+        <aside class="sidebar">
+
+            <nav class="main-navigation" aria-label="Main navigation">
+
+                <button
+                    class="nav-item active"
+                    data-page="dashboard"
+                >
+                    <i class="fa-solid fa-house"></i>
+                    <span>Dashboard</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="currencies"
+                >
+                    <i class="fa-solid fa-coins"></i>
+                    <span>Currencies</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="gold"
+                >
+                    <i class="fa-solid fa-gem"></i>
+                    <span>Gold</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="bitcoin"
+                >
+                    <i class="fa-brands fa-bitcoin"></i>
+                    <span>Markets & Bitcoin</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="inflation"
+                >
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Inflation</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="economy"
+                >
+                    <i class="fa-solid fa-building-columns"></i>
+                    <span>Economy</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="globe"
+                >
+                    <i class="fa-solid fa-earth-europe"></i>
+                    <span>Global Globe</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="calculators"
+                >
+                    <i class="fa-solid fa-calculator"></i>
+                    <span>Calculators</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="history"
+                >
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Historical Archive</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="reports"
+                >
+                    <i class="fa-solid fa-file-lines"></i>
+                    <span>Reports</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="settings"
+                >
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Settings</span>
+                </button>
+
+            </nav>
+
+
+            <div class="sidebar-quote">
+
+                <div class="quote-image">
+                    <i class="fa-solid fa-landmark"></i>
+                </div>
+
+                <p>
+                    "Knowledge builds financial freedom."
+                </p>
+
+                <span>THE MONETARY ARCHIVE</span>
+
+            </div>
+
+
+            <div class="sidebar-footer">
+                <span>INTERNATIONAL FINANCIAL ARCHIVE</span>
+                <span>EST. 2026</span>
+            </div>
+
+        </aside>
+
+
+        <!-- =====================================
+             CONTENT
+        ====================================== -->
+
+        <main class="content-area">
+
+
+            <!-- =================================
+                 DASHBOARD PAGE
+            ================================== -->
+
+            <section
+                class="page-section active"
+                id="page-dashboard"
+                data-section="dashboard"
+            >
+
+                <div class="dashboard-grid">
+
+
+                    <!-- Hero -->
+
+                    <article class="hero-panel">
+
+                        <div class="hero-content">
+
+                            <span class="eyebrow">
+                                THE WORLD FINANCIAL OBSERVATORY
+                            </span>
+
+                            <h1>
+                                Global Finance.<br>
+                                At Your Fingertips.
+                            </h1>
+
+                            <p>
+                                Real financial data.
+                                Historical insights.
+                                Powerful analytical tools.
+                            </p>
+
+                            <button
+                                class="gold-button"
+                                data-action="open-archive"
+                            >
+                                Explore the Archive
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+
+                        </div>
+
+                        <div class="hero-decoration">
+                            <i class="fa-solid fa-earth-europe"></i>
+                        </div>
+
+                    </article>
+
+
+                    <!-- Exchange rates -->
+
+                    <article class="panel exchange-panel">
+
+                        <div class="panel-heading">
+                            <div>
+                                <h2>Live Exchange Rates</h2>
+                                <span class="panel-subtitle" id="ratesUpdated">
+                                    Waiting for data...
+                                </span>
+                            </div>
+
+                            <button
+                                class="text-button"
+                                data-action="open-currencies"
+                            >
+                                View all
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+
+                        <div
+                            class="exchange-list"
+                            id="dashboardExchangeRates"
+                        >
+                            <div class="loading-state">
+                                Loading exchange rates...
+                            </div>
+                        </div>
+
+                    </article>
+
+
+                    <!-- Gold card -->
+
+                    <article class="panel metric-card">
+
+                        <div class="metric-heading">
+                            <div class="metric-icon gold-icon">
+                                <i class="fa-solid fa-coins"></i>
+                            </div>
+
+                            <div>
+                                <h3>Gold Price</h3>
+                                <span class="metric-description">
+                                    Precious metals
+                                </span>
+                            </div>
+                        </div>
+
+                        <div
+                            class="metric-value"
+                            id="dashboardGoldPrice"
+                        >
+                            —
+                        </div>
+
+                        <div
+                            class="metric-change"
+                            id="dashboardGoldChange"
+                        >
+                            Awaiting data
+                        </div>
+
+                        <div class="mini-chart">
+                            <canvas id="goldMiniChart"></canvas>
+                        </div>
+
+                        <div class="metric-footer">
+                            <span>Price per gram</span>
+                            <span id="goldUpdated">—</span>
+                        </div>
+
+                    </article>
+
+
+                    <!-- Inflation card -->
+
+                    <article class="panel metric-card">
+
+                        <div class="metric-heading">
+                            <div class="metric-icon">
+                                <i class="fa-solid fa-chart-line"></i>
+                            </div>
+
+                            <div>
+                                <h3>Inflation</h3>
+                                <span
+                                    class="metric-description"
+                                    id="inflationCountryLabel"
+                                >
+                                    Selected country
+                                </span>
+                            </div>
+                        </div>
+
+                        <div
+                            class="metric-value"
+                            id="dashboardInflation"
+                        >
+                            —
+                        </div>
+
+                        <div
+                            class="metric-change"
+                            id="inflationChange"
+                        >
+                            Awaiting data
+                        </div>
+
+                        <div class="mini-chart">
+                            <canvas id="inflationMiniChart"></canvas>
+                        </div>
+
+                        <div class="metric-footer">
+                            <span>Annual consumer prices</span>
+                            <span id="inflationUpdated">—</span>
+                        </div>
+
+                    </article>
+
+
+                    <!-- GDP card -->
+
+                    <article class="panel metric-card">
+
+                        <div class="metric-heading">
+                            <div class="metric-icon">
+                                <i class="fa-solid fa-chart-column"></i>
+                            </div>
+
+                            <div>
+                                <h3>GDP Growth</h3>
+                                <span
+                                    class="metric-description"
+                                    id="gdpCountryLabel"
+                                >
+                                    Selected country
+                                </span>
+                            </div>
+                        </div>
+
+                        <div
+                            class="metric-value"
+                            id="dashboardGDP"
+                        >
+                            —
+                        </div>
+
+                        <div
+                            class="metric-change"
+                            id="gdpChange"
+                        >
+                            Awaiting data
+                        </div>
+
+                        <div class="mini-chart">
+                            <canvas id="gdpMiniChart"></canvas>
+                        </div>
+
+                        <div class="metric-footer">
+                            <span>Annual GDP growth</span>
+                            <span id="gdpUpdated">—</span>
+                        </div>
+
+                    </article>
+
+
+                    <!-- Bitcoin card -->
+
+                    <article class="panel metric-card bitcoin-card">
+
+                        <div class="metric-heading">
+
+                            <div class="metric-icon bitcoin-icon">
+                                <i class="fa-brands fa-bitcoin"></i>
+                            </div>
+
+                            <div>
+                                <h3>Bitcoin</h3>
+                                <span class="metric-description">
+                                    BTC market price
+                                </span>
+                            </div>
+
+                        </div>
+
+                        <div
+                            class="metric-value"
+                            id="dashboardBitcoinPrice"
+                        >
+                            —
+                        </div>
+
+                        <div
+                            class="metric-change"
+                            id="dashboardBitcoinChange"
+                        >
+                            Awaiting data
+                        </div>
+
+                        <div class="mini-chart">
+                            <canvas id="bitcoinMiniChart"></canvas>
+                        </div>
+
+                        <div class="metric-footer">
+                            <span>24-hour market movement</span>
+                            <span id="bitcoinUpdated">—</span>
+                        </div>
+
+                    </article>
+
+
+                    <!-- Economic calendar -->
+
+                    <article class="panel calendar-panel">
+
+                        <div class="panel-heading">
+
+                            <h2>Economic Calendar</h2>
+
+                            <button
+                                class="text-button"
+                                data-action="open-economy"
+                            >
+                                View all
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+
+                        </div>
+
+                        <div
+                            class="calendar-list"
+                            id="economicCalendar"
+                        >
+                            <div class="empty-state">
+                                Calendar data is not available yet.
+                            </div>
+                        </div>
+
+                    </article>
+
+
+                    <!-- Historical trends -->
+
+                    <article class="panel trends-panel">
+
+                        <div class="panel-heading">
+
+                            <div>
+                                <h2>Historical Trends</h2>
+                                <span class="panel-subtitle">
+                                    Financial data over time
+                                </span>
+                            </div>
+
+                            <select
+                                id="trendCurrency"
+                                aria-label="Chart display currency"
+                            >
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="GBP">GBP</option>
+                                <option value="CHF">CHF</option>
+                                <option value="PLN">PLN</option>
+                                <option value="JPY">JPY</option>
+                            </select>
+
+                        </div>
+
+                        <div class="chart-tabs" id="dashboardChartTabs">
+
+                            <button
+                                class="chart-tab active"
+                                data-chart="currencies"
+                            >
+                                Currencies
+                            </button>
+
+                            <button
+                                class="chart-tab"
+                                data-chart="gold"
+                            >
+                                Gold
+                            </button>
+
+                            <button
+                                class="chart-tab"
+                                data-chart="bitcoin"
+                            >
+                                Bitcoin
+                            </button>
+
+                            <button
+                                class="chart-tab"
+                                data-chart="inflation"
+                            >
+                                Inflation
+                            </button>
+
+                            <button
+                                class="chart-tab"
+                                data-chart="gdp"
+                            >
+                                GDP
+                            </button>
+
+                        </div>
+
+                        <div class="large-chart-container">
+                            <canvas id="dashboardMainChart"></canvas>
+                        </div>
+
+                        <div class="chart-periods" data-chart-periods>
+
+                            <button data-period="7d">7D</button>
+                            <button data-period="30d" class="active">30D</button>
+                            <button data-period="90d">90D</button>
+                            <button data-period="1y">1Y</button>
+                            <button data-period="5y">5Y</button>
+
+                        </div>
+
+                    </article>
+
+
+                    <!-- Currency converter -->
+
+                    <article class="panel converter-panel">
+
+                        <div class="panel-heading">
+                            <h2>Currency Converter</h2>
+                        </div>
+
+                        <div class="converter-field">
+
+                            <label for="converterFromAmount">
+                                Amount
+                            </label>
+
+                            <input
+                                type="number"
+                                id="converterFromAmount"
+                                min="0"
+                                step="any"
+                                value="1"
+                            >
+
+                        </div>
+
+                        <div class="converter-row">
+
+                            <label for="converterFrom">
+                                From
+                            </label>
+
+                            <select id="converterFrom">
+                                <option value="USD">USD — US Dollar</option>
+                                <option value="EUR">EUR — Euro</option>
+                                <option value="GBP">GBP — Pound Sterling</option>
+                                <option value="CHF">CHF — Swiss Franc</option>
+                                <option value="PLN">PLN — Polish Zloty</option>
+                                <option value="JPY">JPY — Japanese Yen</option>
+                                <option value="CAD">CAD — Canadian Dollar</option>
+                                <option value="AUD">AUD — Australian Dollar</option>
+                                <option value="CNY">CNY — Chinese Yuan</option>
+                                <option value="INR">INR — Indian Rupee</option>
+                            </select>
+
+                        </div>
+
+                        <button
+                            class="swap-button"
+                            id="swapCurrencies"
+                            aria-label="Swap currencies"
+                        >
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                        </button>
+
+                        <div class="converter-row">
+
+                            <label for="converterTo">
+                                To
+                            </label>
+
+                            <select id="converterTo">
+                                <option value="PLN">PLN — Polish Zloty</option>
+                                <option value="USD">USD — US Dollar</option>
+                                <option value="EUR">EUR — Euro</option>
+                                <option value="GBP">GBP — Pound Sterling</option>
+                                <option value="CHF">CHF — Swiss Franc</option>
+                                <option value="JPY">JPY — Japanese Yen</option>
+                                <option value="CAD">CAD — Canadian Dollar</option>
+                                <option value="AUD">AUD — Australian Dollar</option>
+                                <option value="CNY">CNY — Chinese Yuan</option>
+                                <option value="INR">INR — Indian Rupee</option>
+                            </select>
+
+                        </div>
+
+                        <div class="converter-result">
+
+                            <span>Converted amount</span>
+
+                            <strong id="converterResult">
+                                —
+                            </strong>
+
+                        </div>
+
+                        <button
+                            class="gold-button full-width"
+                            id="convertCurrency"
+                        >
+                            Convert
+                        </button>
+
+                        <div
+                            class="converter-rate"
+                            id="converterRate"
+                        >
+                            Exchange rate will appear here.
+                        </div>
+
+                    </article>
+
+
+                    <!-- Quick calculators -->
+
+                    <article class="panel quick-calculators">
+
+                        <div class="panel-heading">
+                            <h2>Quick Calculators</h2>
+                        </div>
+
+                        <button
+                            class="calculator-link"
+                            data-calculator="inflation"
+                        >
+                            <i class="fa-solid fa-money-bill-trend-up"></i>
+                            <span>Inflation Calculator</span>
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+
+                        <button
+                            class="calculator-link"
+                            data-calculator="compound"
+                        >
+                            <i class="fa-solid fa-chart-pie"></i>
+                            <span>Compound Interest</span>
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+
+                        <button
+                            class="calculator-link"
+                            data-calculator="simple"
+                        >
+                            <i class="fa-solid fa-coins"></i>
+                            <span>Simple Interest</span>
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+
+                        <button
+                            class="calculator-link"
+                            data-calculator="future"
+                        >
+                            <i class="fa-solid fa-hourglass-half"></i>
+                            <span>Future Value</span>
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+
+                    </article>
+
+
+                    <!-- Key indicators -->
+
+                    <article class="panel indicators-panel">
+
+                        <div class="panel-heading">
+
+                            <h2>Key Indicators</h2>
+
+                            <button
+                                class="text-button"
+                                data-action="open-economy"
+                            >
+                                View all
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+
+                        </div>
+
+                        <div
+                            class="indicator-grid"
+                            id="dashboardIndicators"
+                        >
+                            <div class="empty-state">
+                                Economic indicators are loading...
+                            </div>
+                        </div>
+
+                    </article>
+
+
+                    <!-- Market overview -->
+
+                    <article class="panel market-panel">
+
+                        <div class="panel-heading">
+
+                            <h2>Market Overview</h2>
+
+                            <button
+                                class="text-button"
+                                data-action="open-bitcoin"
+                            >
+                                View more
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+
+                        </div>
+
+                        <div
+                            class="market-grid"
+                            id="marketOverview"
+                        >
+                            <div class="empty-state">
+                                Market data is loading...
+                            </div>
+                        </div>
+
+                    </article>
+
+
+                    <!-- Archive banner -->
+
+                    <article class="archive-banner">
+
+                        <div class="archive-banner-content">
+
+                            <span class="eyebrow">
+                                THE HISTORICAL COLLECTION
+                            </span>
+
+                            <h2>
+                                Explore the past.<br>
+                                Understand the present.<br>
+                                Plan the future.
+                            </h2>
+
+                            <button
+                                class="gold-button"
+                                data-action="open-history"
+                            >
+                                Dive into History
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+
+                        </div>
+
+                    </article>
+
+                </div>
+
+            </section>
+
+
+            <!-- =================================
+                 CURRENCIES PAGE
+            ================================== -->
+
+            <section
+                class="page-section"
+                id="page-currencies"
+                data-section="currencies"
+            >
+
+                <div class="page-heading">
+
+                    <div>
+                        <span class="eyebrow">FOREIGN EXCHANGE ARCHIVE</span>
+                        <h1>Currencies</h1>
+                        <p>
+                            International exchange rates and currency history.
+                        </p>
+                    </div>
+
+                    <button
+                        class="outline-button"
+                        data-action="refresh-currencies"
+                    >
+                        <i class="fa-solid fa-rotate"></i>
+                        Refresh data
+                    </button>
+
+                </div>
+
+
+                <div class="stats-grid">
+
+                    <article class="panel stat-box">
+                        <span>Base currency</span>
+                        <strong id="currencyBase">USD</strong>
+                    </article>
+
+                    <article class="panel stat-box">
+                        <span>Available currencies</span>
+                        <strong id="currencyCount">—</strong>
+                    </article>
+
+                    <article class="panel stat-box">
+                        <span>Latest update</span>
+                        <strong id="currencyLastUpdate">—</strong>
+                    </article>
+
+                </div>
+
+
+                <article class="panel table-panel">
+
+                    <div class="panel-heading">
+                        <h2>Exchange Rate Directory</h2>
+
+                        <input
+                            type="search"
+                            id="currencySearch"
+                            placeholder="Search currency..."
+                        >
+                    </div>
+
+                    <div class="table-toolbar">
+
+                        <label>
+                            Display currency
+
+                            <select id="currencyDisplay">
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="GBP">GBP</option>
+                                <option value="CHF">CHF</option>
+                                <option value="PLN">PLN</option>
+                                <option value="JPY">JPY</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Sort by
+
+                            <select id="currencySort">
+                                <option value="code">Currency code</option>
+                                <option value="name">Currency name</option>
+                                <option value="rate-asc">Rate: low to high</option>
+                                <option value="rate-desc">Rate: high to low</option>
+                            </select>
+                        </label>
+
+                    </div>
+
+                    <div class="table-scroll">
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Currency</th>
+                                    <th>Code</th>
+                                    <th>Rate</th>
+                                    <th>Previous rate</th>
+                                    <th>Change</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="currenciesTableBody">
+                                <tr>
+                                    <td colspan="6">
+                                        Loading currency data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+
+                </article>
+
+
+                <article class="panel">
+
+                    <div class="panel-heading">
+                        <h2>Currency History</h2>
+                    </div>
+
+                    <div class="history-controls">
+
+                        <label>
+                            Currency
+
+                            <select id="currencyHistoryCode">
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="GBP">GBP</option>
+                                <option value="CHF">CHF</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Period
+
+                            <select id="currencyHistoryPeriod">
+                                <option value="30d">30 days</option>
+                                <option value="90d">90 days</option>
+                                <option value="1y">1 year</option>
+                                <option value="5y">5 years</option>
+                            </select>
+                        </label>
+
+                    </div>
+
+                    <div class="large-chart-container">
+                        <canvas id="currencyHistoryChart"></canvas>
+                    </div>
+
+                </article>
+
+            </section>
+
+
+            <!-- =================================
+                 GOLD PAGE
+            ================================== -->
+
+            <section
+                class="page-section"
+                id="page-gold"
+                data-section="gold"
+            >
+
+                <div class="page-heading">
+
+                    <div>
+                        <span class="eyebrow">PRECIOUS METALS ARCHIVE</span>
+                        <h1>Gold</h1>
+                        <p>
+                            Gold prices, historical records and market analysis.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="stats-grid">
+
+                    <article class="panel stat-box">
+                        <span>Price per gram</span>
+                        <strong id="goldGramPrice">—</strong>
+                    </article>
+
+                    <article class="panel stat-box">
+                        <span>Price per troy ounce</span>
+                        <strong id="goldOuncePrice">—</strong>
+                    </article>
+
+                    <article class="panel stat-box">
+                        <span>Data source</span>
+                        <strong id="goldSource">—</strong>
+                    </article>
+
+                </div>
+
+
+                <article class="panel">
+
+                    <div class="panel-heading">
+                        <h2>Gold Price History</h2>
+
+                        <select id="goldHistoryCurrency">
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="PLN">PLN</option>
+                            <option value="CHF">CHF</option>
+                        </select>
+
+                    </div>
 
-<div class="sidebar-bottom">PUBLIC DATA · INDEPENDENT ARCHIVE</div>
-</aside>
+                    <div class="chart-periods" data-gold-periods>
+                        <button data-period="30d" class="active">30D</button>
+                        <button data-period="90d">90D</button>
+                        <button data-period="1y">1Y</button>
+                    </div>
+
+                    <div class="large-chart-container">
+                        <canvas id="goldHistoryChart"></canvas>
+                    </div>
+
+                </article>
+
+            </section>
+
+
+            <!-- =================================
+                 BITCOIN AND MARKETS PAGE
+            ================================== -->
+
+            <section
+                class="page-section"
+                id="page-bitcoin"
+                data-section="bitcoin"
+            >
+
+                <div class="page-heading">
+
+                    <div>
+                        <span class="eyebrow">DIGITAL ASSET & MARKETS ARCHIVE</span>
+                        <h1>Markets & Bitcoin</h1>
+                        <p>
+                            Digital asset statistics and financial market data.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="stats-grid">
+
+                    <article class="panel stat-box">
+                        <span>Bitcoin price</span>
+                        <strong id="bitcoinPrice">—</strong>
+                    </article>
 
-<div class="main-area">
+                    <article class="panel stat-box">
+                        <span>24-hour change</span>
+                        <strong id="bitcoinChange">—</strong>
+                    </article>
 
-<header class="topbar">
-<button class="mobile-menu" id="mobile-menu" aria-label="Open menu">☰</button>
+                    <article class="panel stat-box">
+                        <span>Market capitalization</span>
+                        <strong id="bitcoinMarketCap">—</strong>
+                    </article>
 
-<div class="crumb">
-GLOBAL FINANCIAL INTELLIGENCE
-<span>/</span>
-<b id="breadcrumb">OVERVIEW</b>
-</div>
+                    <article class="panel stat-box">
+                        <span>24-hour volume</span>
+                        <strong id="bitcoinVolume">—</strong>
+                    </article>
 
-<div class="top-actions">
-<label class="currency-switch">
-DISPLAY IN
-<select id="display-currency" aria-label="Display currency">
-<option>USD</option>
-<option>EUR</option>
-<option>GBP</option>
-<option>CHF</option>
-<option>JPY</option>
-<option>PLN</option>
-<option>CAD</option>
-<option>AUD</option>
-<option>CNY</option>
-<option>INR</option>
-<option>BRL</option>
-<option>SEK</option>
-<option>NOK</option>
-<option>DKK</option>
-<option>CZK</option>
-<option>HUF</option>
-</select>
-</label>
-
-<span class="live-state" id="connection-status"><i></i> CONNECTING</span>
-<span class="clock" id="live-clock">—</span>
-</div>
-</header>
-
-<main class="content">
-
-<!-- OVERVIEW -->
-<section class="page active" id="page-overview">
-
-<div class="hero">
-<div class="hero-copy">
-<p class="eyebrow">AN ATLAS OF WORLD FINANCE</p>
-<h1>The Monetary<br><em>Archive</em></h1>
-<p>Real-world financial data. Historical perspective.<br>A clearer view of the global economy.</p>
-<button class="gold-button" data-go="globe">
-EXPLORE THE WORLD <span>→</span>
-</button>
-</div>
+                </div>
 
-<div class="hero-art">
-<div class="hero-orbit"></div>
-<div class="hero-globe">◎</div>
-<div class="hero-caption">
-GLOBAL ECONOMIC OBSERVATORY
-<span>EST. MMXXVI</span>
-</div>
-</div>
-</div>
 
-<div class="ticker">
-<span>GLOBAL INDICATORS</span>
-<b id="ticker-usd">USD —</b>
-<b id="ticker-eur">EUR —</b>
-<b id="ticker-btc">BTC —</b>
-<b id="ticker-gold">GOLD —</b>
-<small id="last-updated">Awaiting public sources</small>
-</div>
+                <article class="panel">
 
-<div class="stat-grid">
-
-<article class="stat-card">
-<span class="stat-icon">$</span>
-<div>
-<small>BITCOIN · BTC / USD</small>
-<strong id="overview-btc">—</strong>
-<em id="overview-btc-meta">Waiting for CoinGecko</em>
-</div>
-</article>
-
-<article class="stat-card">
-<span class="stat-icon">◈</span>
-<div>
-<small>GOLD · PER TROY OUNCE</small>
-<strong id="overview-gold">—</strong>
-<em id="overview-gold-meta">NBP reference converted to USD</em>
-</div>
-</article>
-
-<article class="stat-card">
-<span class="stat-icon">⇄</span>
-<div>
-<small>EUR / USD</small>
-<strong id="overview-eurusd">—</strong>
-<em id="overview-fx-meta">NBP reference rates</em>
-</div>
-</article>
-
-<article class="stat-card">
-<span class="stat-icon">▥</span>
-<div>
-<small>US INFLATION · LATEST</small>
-<strong id="overview-inflation">—</strong>
-<em id="overview-inflation-meta">World Bank annual series</em>
-</div>
-</article>
+                    <div class="panel-heading">
+                        <h2>Bitcoin Price History</h2>
 
-</div>
+                        <select id="bitcoinCurrency">
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="PLN">PLN</option>
+                            <option value="CHF">CHF</option>
+                        </select>
 
-<div class="dashboard-grid">
+                    </div>
+
+                    <div class="chart-periods" data-bitcoin-periods>
+                        <button data-period="24h">24H</button>
+                        <button data-period="7d" class="active">7D</button>
+                        <button data-period="30d">30D</button>
+                        <button data-period="90d">90D</button>
+                        <button data-period="1y">1Y</button>
+                    </div>
+
+                    <div class="large-chart-container">
+                        <canvas id="bitcoinHistoryChart"></canvas>
+                    </div>
 
-<article class="panel chart-panel">
-<div class="panel-head">
-<div>
-<p class="eyebrow">MARKET HISTORY</p>
-<h2>Bitcoin · USD</h2>
-</div>
-<span class="source-tag">COINGECKO</span>
-</div>
+                </article>
 
-<div class="chart-summary">
-<strong id="btc-chart-current">—</strong>
-<span>Historical daily prices</span>
-</div>
 
-<div class="chart-box">
-<canvas id="btc-chart"></canvas>
-</div>
+                <article class="panel">
 
-<p class="footnote" id="btc-chart-note">
-Historical series will appear when the source responds.
-</p>
-</article>
-
-<article class="panel rates-panel">
-<div class="panel-head">
-<div>
-<p class="eyebrow">FOREIGN EXCHANGE</p>
-<h2>Major currencies</h2>
-</div>
-<button class="text-button" data-go="currencies">FULL TABLE →</button>
-</div>
+                    <div class="panel-heading">
+                        <h2>Market Data</h2>
+                    </div>
 
-<div id="overview-rates" class="rate-list">
-<div class="empty">Loading published reference rates…</div>
-</div>
+                    <div
+                        class="market-grid detailed-market-grid"
+                        id="detailedMarketData"
+                    >
+                        <div class="empty-state">
+                            Market information is loading...
+                        </div>
+                    </div>
 
-<p class="footnote">
-Converted from NBP daily reference rates. USD is the default display currency.
-</p>
-</article>
+                    <p class="data-disclaimer">
+                        Market information is displayed only when a reliable
+                        data source is available. Delayed or unavailable quotes
+                        will be clearly identified.
+                    </p>
+
+                </article>
+
+            </section>
+
+
+            <!-- =================================
+                 INFLATION PAGE
+            ================================== -->
 
-</div>
+            <section
+                class="page-section"
+                id="page-inflation"
+                data-section="inflation"
+            >
 
-<div class="dashboard-grid lower-grid">
+                <div class="page-heading">
 
-<article class="panel">
-<div class="panel-head">
-<div>
-<p class="eyebrow">GLOBAL ECONOMY</p>
-<h2>Selected indicators</h2>
-</div>
-<button class="text-button" data-go="inflation">EXPLORE →</button>
-</div>
+                    <div>
+                        <span class="eyebrow">PURCHASING POWER ARCHIVE</span>
+                        <h1>Inflation</h1>
+                        <p>
+                            Consumer prices, inflation rates and historical trends.
+                        </p>
+                    </div>
 
-<div class="indicator-list" id="overview-indicators">
-<div class="empty">Economic series loading…</div>
-</div>
-</article>
-
-<article class="panel">
-<div class="panel-head">
-<div>
-<p class="eyebrow">DATA INTEGRITY</p>
-<h2>Source monitor</h2>
-</div>
-</div>
+                </div>
 
-<div id="source-monitor" class="source-list">
-<div class="empty">Checking sources…</div>
-</div>
-</article>
 
-</div>
-</section>
-
-<!-- GLOBE -->
-<section class="page" id="page-globe">
-
-<div class="page-title">
-<p class="eyebrow">INTERACTIVE WORLD ATLAS</p>
-<h1>Global Financial <em>Globe</em></h1>
-<p>Rotate the planet, select a country and explore its published economic indicators.</p>
-</div>
+                <div class="stats-grid">
 
-<div class="globe-layout">
+                    <article class="panel stat-box">
+                        <span>Annual inflation</span>
+                        <strong id="inflationCurrent">—</strong>
+                    </article>
 
-<article class="panel globe-panel">
-<div class="panel-head">
-<div>
-<p class="eyebrow">PLANET EARTH</p>
-<h2>Choose a country</h2>
-</div>
-<span class="source-tag">DRAG TO ROTATE · SCROLL TO ZOOM</span>
-</div>
+                    <article class="panel stat-box">
+                        <span>Previous observation</span>
+                        <strong id="inflationPrevious">—</strong>
+                    </article>
 
-<div id="globe-container">
-<div class="globe-loading">Preparing the world atlas…</div>
-</div>
+                    <article class="panel stat-box">
+                        <span>Observation year</span>
+                        <strong id="inflationYear">—</strong>
+                    </article>
 
-<div class="globe-controls">
-<button id="globe-auto-rotate" class="outline-button">PAUSE ROTATION</button>
-<span>Click a highlighted country to open its profile</span>
-</div>
-</article>
-
-<aside class="panel country-panel" id="country-profile">
-<p class="eyebrow">COUNTRY DOSSIER</p>
-<h2 id="country-name">Select a country</h2>
-<p id="country-description" class="muted">
-Choose any country on the globe to inspect its economy.
-</p>
-
-<div class="country-stats" id="country-stats">
-<div class="empty">No country selected.</div>
-</div>
+                </div>
 
-<h3>Major exchanges</h3>
 
-<div id="country-exchanges" class="exchange-list">
-Exchange directory
-</div>
+                <article class="panel">
 
-<p class="footnote">
-Country indicators are annual or quarterly statistical observations, not live trading quotes.
-Exchange names are reference information; live index prices are not included unless a source is connected.
-</p>
-</aside>
+                    <div class="panel-heading">
+                        <h2>Inflation History</h2>
+
+                        <select id="inflationCountry">
+                            <option value="PL">Poland</option>
+                            <option value="US">United States</option>
+                            <option value="GB">United Kingdom</option>
+                            <option value="DE">Germany</option>
+                            <option value="FR">France</option>
+                            <option value="JP">Japan</option>
+                            <option value="CN">China</option>
+                            <option value="IN">India</option>
+                            <option value="BR">Brazil</option>
+                            <option value="CA">Canada</option>
+                        </select>
+
+                    </div>
+
+                    <div class="large-chart-container">
+                        <canvas id="inflationHistoryChart"></canvas>
+                    </div>
 
-</div>
-</section>
-
-<!-- CURRENCIES -->
-<section class="page" id="page-currencies">
-
-<div class="page-title">
-<p class="eyebrow">FOREIGN EXCHANGE ARCHIVE</p>
-<h1>Currency <em>Exchange</em></h1>
-<p>All values are converted into the selected display currency using published NBP reference rates.</p>
-</div>
+                </article>
 
-<article class="panel">
-<div class="panel-head">
-<div>
-<p class="eyebrow">CURRENCY TABLE</p>
-<h2>International reference rates</h2>
-</div>
-<span class="source-tag" id="currency-date">SOURCE DATE —</span>
-</div>
 
-<div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th>CODE</th>
-<th>CURRENCY</th>
-<th>VALUE IN <span class="display-code">USD</span></th>
-<th>VALUE IN PLN</th>
-<th>SOURCE</th>
-</tr>
-</thead>
-
-<tbody id="currency-table">
-<tr><td colspan="5">Loading rates…</td></tr>
-</tbody>
-</table>
-</div>
-</article>
-
-<div class="panel converter">
-<div>
-<p class="eyebrow">CROSS-RATE CALCULATOR</p>
-<h2>Currency converter</h2>
-</div>
+                <article class="panel table-panel">
 
-<div class="converter-fields">
-
-<label>
-Amount
-<input id="convert-amount" type="number" min="0" step="any" value="1">
-</label>
-
-<label>
-From
-<select id="convert-from"></select>
-</label>
-
-<label>
-To
-<select id="convert-to"></select>
-</label>
-
-<div class="conversion-result">
-<small>RESULT</small>
-<strong id="convert-result">—</strong>
-</div>
+                    <div class="panel-heading">
+                        <h2>International Inflation Comparison</h2>
+                    </div>
 
-</div>
+                    <div class="table-scroll">
 
-<p class="footnote" id="converter-note">
-Uses latest available published reference rates. Conversion is indicative, not a transaction quote.
-</p>
-</div>
-</section>
-
-<!-- MARKETS -->
-<section class="page" id="page-markets">
-
-<div class="page-title">
-<p class="eyebrow">DIGITAL ASSETS & COMMODITIES</p>
-<h1>Markets & <em>Bitcoin</em></h1>
-<p>Public market data with source timestamps and clear update limitations.</p>
-</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Country</th>
+                                    <th>Latest rate</th>
+                                    <th>Previous year</th>
+                                    <th>Observation year</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
 
-<div class="stat-grid two">
-
-<article class="stat-card">
-<span class="stat-icon">₿</span>
-<div>
-<small>BITCOIN · BTC</small>
-<strong id="market-btc">—</strong>
-<em id="market-btc-meta">CoinGecko public market data</em>
-</div>
-</article>
-
-<article class="stat-card">
-<span class="stat-icon">◈</span>
-<div>
-<small>GOLD · TROY OUNCE</small>
-<strong id="market-gold">—</strong>
-<em id="market-gold-meta">Converted from NBP gold reference</em>
-</div>
-</article>
+                            <tbody id="inflationComparisonBody">
+                                <tr>
+                                    <td colspan="5">
+                                        Loading data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
 
-</div>
+                    </div>
 
-<div class="dashboard-grid">
+                </article>
 
-<article class="panel chart-panel">
-<div class="panel-head">
-<div>
-<p class="eyebrow">BITCOIN PRICE HISTORY</p>
-<h2>BTC / USD</h2>
-</div>
+            </section>
 
-<select id="btc-period" class="small-select">
-<option value="7">7 days</option>
-<option value="30" selected>30 days</option>
-<option value="90">90 days</option>
-</select>
-</div>
 
-<div class="chart-box tall">
-<canvas id="market-btc-chart"></canvas>
-</div>
+            <!-- =================================
+                 ECONOMY PAGE
+            ================================== -->
 
-<p class="footnote" id="market-btc-note">
-Source: CoinGecko public API. Availability and rate limits may vary.
-</p>
-</article>
-
-<article class="panel">
-<div class="panel-head">
-<div>
-<p class="eyebrow">MARKET REFERENCE</p>
-<h2>Market data status</h2>
-</div>
-</div>
+            <section
+                class="page-section"
+                id="page-economy"
+                data-section="economy"
+            >
 
-<div class="source-list" id="market-sources"></div>
+                <div class="page-heading">
 
-<p class="footnote">
-Stock exchange directories and benchmark names are not live quotes.
-Real-time exchange data generally requires a dedicated market-data provider.
-</p>
-</article>
+                    <div>
+                        <span class="eyebrow">GLOBAL ECONOMIC RECORDS</span>
+                        <h1>Economy</h1>
+                        <p>
+                            Economic indicators and international comparisons.
+                        </p>
+                    </div>
 
-</div>
-</section>
-
-<!-- ECONOMY -->
-<section class="page" id="page-inflation">
-
-<div class="page-title">
-<p class="eyebrow">MACROECONOMIC RECORDS</p>
-<h1>Inflation & <em>Economy</em></h1>
-<p>Latest available annual observations from the World Bank.</p>
-</div>
+                </div>
 
-<article class="panel">
 
-<div class="panel-head">
-<div>
-<p class="eyebrow">COUNTRY COMPARISON</p>
-<h2>Economic indicators</h2>
-</div>
+                <div class="economy-controls">
 
-<select id="indicator-select" class="small-select">
-<option value="inflation">Inflation</option>
-<option value="gdp">GDP growth</option>
-<option value="unemployment">Unemployment</option>
-</select>
-</div>
+                    <label>
+                        Country
 
-<div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th>COUNTRY</th>
-<th>INDICATOR</th>
-<th>VALUE</th>
-<th>YEAR</th>
-<th>SOURCE</th>
-</tr>
-</thead>
-
-<tbody id="economy-table">
-<tr><td colspan="5">Loading observations…</td></tr>
-</tbody>
-</table>
-</div>
+                        <select id="economyCountry">
+                            <option value="PL">Poland</option>
+                            <option value="US">United States</option>
+                            <option value="GB">United Kingdom</option>
+                            <option value="DE">Germany</option>
+                            <option value="FR">France</option>
+                            <option value="CH">Switzerland</option>
+                            <option value="JP">Japan</option>
+                            <option value="CN">China</option>
+                            <option value="IN">India</option>
+                            <option value="BR">Brazil</option>
+                            <option value="CA">Canada</option>
+                            <option value="AU">Australia</option>
+                        </select>
 
-</article>
-</section>
+                    </label>
 
-<!-- CALCULATORS -->
-<section class="page" id="page-calculator">
+                    <label>
+                        Indicator
 
-<div class="page-title">
-<p class="eyebrow">FINANCIAL INSTRUMENTS</p>
-<h1>Archive <em>Calculators</em></h1>
-<p>Independent calculations using the inputs you provide.</p>
-</div>
+                        <select id="economyIndicator">
+                            <option value="gdp">GDP Growth</option>
+                            <option value="unemployment">Unemployment</option>
+                            <option value="inflation">Inflation</option>
+                            <option value="gdpPerCapita">GDP Per Capita</option>
+                            <option value="population">Population</option>
+                        </select>
 
-<div class="calculator-grid">
+                    </label>
 
-<article class="panel">
-<p class="eyebrow">CURRENCY</p>
-<h2>Currency converter</h2>
+                </div>
 
-<label>Amount
-<input id="calc-amount" type="number" min="0" value="100">
-</label>
 
-<label>From
-<select id="calc-from"></select>
-</label>
+                <div class="stats-grid">
 
-<label>To
-<select id="calc-to"></select>
-</label>
+                    <article class="panel stat-box">
+                        <span>GDP growth</span>
+                        <strong id="economyGDP">—</strong>
+                    </article>
 
-<button class="gold-button" id="calc-convert">CONVERT →</button>
-<strong class="calc-result" id="calc-currency-result">—</strong>
-</article>
+                    <article class="panel stat-box">
+                        <span>Unemployment</span>
+                        <strong id="economyUnemployment">—</strong>
+                    </article>
 
-<article class="panel">
-<p class="eyebrow">PURCHASING POWER</p>
-<h2>Inflation calculator</h2>
+                    <article class="panel stat-box">
+                        <span>Inflation</span>
+                        <strong id="economyInflation">—</strong>
+                    </article>
 
-<label>Initial amount
-<input id="inflation-amount" type="number" min="0" value="1000">
-</label>
+                    <article class="panel stat-box">
+                        <span>GDP per capita</span>
+                        <strong id="economyGDPPerCapita">—</strong>
+                    </article>
 
-<label>Annual inflation (%)
-<input id="inflation-rate" type="number" step="0.01" value="3">
-</label>
+                </div>
 
-<label>Years
-<input id="inflation-years" type="number" min="0" max="100" value="10">
-</label>
 
-<button class="gold-button" id="calc-inflation">CALCULATE →</button>
-<strong class="calc-result" id="inflation-result">—</strong>
-</article>
+                <article class="panel">
 
-<article class="panel">
-<p class="eyebrow">COMPOUND GROWTH</p>
-<h2>Compound interest</h2>
+                    <div class="panel-heading">
+                        <h2>Economic Development</h2>
+                    </div>
 
-<label>Principal
-<input id="compound-principal" type="number" min="0" value="1000">
-</label>
+                    <div class="large-chart-container">
+                        <canvas id="economyHistoryChart"></canvas>
+                    </div>
 
-<label>Annual rate (%)
-<input id="compound-rate" type="number" step="0.01" value="5">
-</label>
+                </article>
 
-<label>Years
-<input id="compound-years" type="number" min="0" max="100" value="10">
-</label>
 
-<button class="gold-button" id="calc-compound">CALCULATE →</button>
-<strong class="calc-result" id="compound-result">—</strong>
-</article>
+                <article class="panel table-panel">
 
-</div>
-</section>
-
-<!-- ARCHIVE -->
-<section class="page" id="page-archive">
-
-<div class="page-title">
-<p class="eyebrow">PRESERVED OBSERVATIONS</p>
-<h1>Historical <em>Archive</em></h1>
-<p>Search and export the records retrieved from public data providers.</p>
-</div>
+                    <div class="panel-heading">
+                        <h2>Country Comparison</h2>
+                    </div>
 
-<article class="panel">
+                    <div class="table-scroll">
 
-<div class="archive-tools">
-<input id="archive-search" type="search" placeholder="Search country, indicator or source…">
-<button class="outline-button" id="export-csv">EXPORT CSV ↓</button>
-</div>
+                        <table>
+
+                            <thead>
+                                <tr>
+                                    <th>Country</th>
+                                    <th>GDP Growth</th>
+                                    <th>Inflation</th>
+                                    <th>Unemployment</th>
+                                    <th>GDP Per Capita</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="economyComparisonBody">
+                                <tr>
+                                    <td colspan="5">
+                                        Loading economic indicators...
+                                    </td>
+                                </tr>
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </article>
+
+            </section>
+
+
+            <!-- =================================
+                 GLOBAL GLOBE PAGE
+            ================================== -->
+
+            <section
+                class="page-section"
+                id="page-globe"
+                data-section="globe"
+            >
+
+                <div class="page-heading">
+
+                    <div>
+                        <span class="eyebrow">GLOBAL FINANCIAL OBSERVATORY</span>
+                        <h1>The World</h1>
+                        <p>
+                            Explore countries and their economic indicators.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <article class="panel globe-panel">
+
+                    <div class="globe-toolbar">
+
+                        <div>
+                            <span class="live-dot"></span>
+                            <span>Interactive world map</span>
+                        </div>
+
+                        <div class="globe-controls">
+
+                            <button
+                                id="globeZoomIn"
+                                aria-label="Zoom in"
+                            >
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+
+                            <button
+                                id="globeZoomOut"
+                                aria-label="Zoom out"
+                            >
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+
+                            <button
+                                id="globeReset"
+                                aria-label="Reset globe"
+                            >
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+
+                            <button
+                                id="globeAutoRotate"
+                                aria-label="Toggle automatic rotation"
+                            >
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="globe-layout">
+
+                        <div
+                            id="globe-container"
+                            class="globe-container"
+                        >
+                            <div class="globe-loading">
+                                Preparing the Earth...
+                            </div>
+                        </div>
+
+
+                        <aside class="country-information" id="countryInformation">
+
+                            <div class="country-placeholder">
+
+                                <i class="fa-solid fa-earth-europe"></i>
+
+                                <h2>Select a country</h2>
+
+                                <p>
+                                    Click a country on the globe to explore
+                                    its economic information.
+                                </p>
+
+                            </div>
+
+                            <div
+                                class="country-details"
+                                id="countryDetails"
+                                hidden
+                            >
+
+                                <div class="country-details-heading">
+
+                                    <span class="eyebrow">
+                                        COUNTRY PROFILE
+                                    </span>
+
+                                    <h2 id="countryName">—</h2>
+
+                                    <span id="countryCode">—</span>
+
+                                </div>
+
+
+                                <div class="country-stat">
+                                    <span>Currency</span>
+                                    <strong id="countryCurrency">—</strong>
+                                </div>
+
+                                <div class="country-stat">
+                                    <span>GDP growth</span>
+                                    <strong id="countryGDP">—</strong>
+                                </div>
+
+                                <div class="country-stat">
+                                    <span>Inflation</span>
+                                    <strong id="countryInflation">—</strong>
+                                </div>
+
+                                <div class="country-stat">
+                                    <span>Unemployment</span>
+                                    <strong id="countryUnemployment">—</strong>
+                                </div>
+
+                                <div class="country-stat">
+                                    <span>GDP per capita</span>
+                                    <strong id="countryGDPPerCapita">—</strong>
+                                </div>
+
+                                <div class="country-data-source">
+                                    <span>Source</span>
+                                    <span id="countryDataSource">—</span>
+                                </div>
+
+                                <div class="country-data-source">
+                                    <span>Observation date</span>
+                                    <span id="countryObservationDate">—</span>
+                                </div>
+
+                            </div>
+
+                        </aside>
+
+                    </div>
+
+                </article>
+
+            </section>
+
+
+            <!-- =================================
+                 CALCULATORS PAGE
+            ================================== -->
+
+            <section
+                class="page-section"
+                id="page-calculators"
+                data-section="calculators"
+            >
+
+                <div class="page-heading">
+
+                    <div>
+                        <span class="eyebrow">FINANCIAL COMPUTATION TOOLS</span>
+                        <h1>Calculators</h1>
+                        <p>
+                            Calculate interest, inflation and future purchasing power.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="calculator-grid">
+
+
+                    <!-- Currency calculator -->
+
+                    <article class="panel calculator-panel">
+
+                        <div class="calculator-title">
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                            <h2>Currency Converter</h2>
+                        </div>
+
+                        <label for="calcCurrencyAmount">
+                            Amount
+                        </label>
+
+                        <input
+                            type="number"
+                            id="calcCurrencyAmount"
+                            min="0"
+                            step="any"
+                            value="100"
+                        >
+
+                        <label for="calcCurrencyFrom">
+                            From
+                        </label>
+
+                        <select id="calcCurrencyFrom">
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="PLN">PLN</option>
+                            <option value="CHF">CHF</option>
+                        </select>
+
+                        <label for="calcCurrencyTo">
+                            To
+                        </label>
+
+                        <select id="calcCurrencyTo">
+                            <option value="PLN">PLN</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="CHF">CHF</option>
+                        </select>
+
+                        <button
+                            class="gold-button full-width"
+                            id="calculateCurrency"
+                        >
+                            Calculate
+                        </button>
+
+                        <div
+                            class="calculator-result"
+                            id="calcCurrencyResult"
+                        >
+                            —
+                        </div>
+
+                    </article>
+
+
+                    <!-- Compound interest -->
+
+                    <article class="panel calculator-panel">
+
+                        <div class="calculator-title">
+                            <i class="fa-solid fa-chart-line"></i>
+                            <h2>Compound Interest</h2>
+                        </div>
+
+                        <label for="compoundPrincipal">
+                            Initial amount
+                        </label>
+
+                        <input
+                            type="number"
+                            id="compoundPrincipal"
+                            min="0"
+                            step="any"
+                            value="1000"
+                        >
+
+                        <label for="compoundRate">
+                            Annual interest rate (%)
+                        </label>
+
+                        <input
+                            type="number"
+                            id="compoundRate"
+                            min="0"
+                            step="any"
+                            value="5"
+                        >
+
+                        <label for="compoundYears">
+                            Years
+                        </label>
+
+                        <input
+                            type="number"
+                            id="compoundYears"
+                            min="0"
+                            step="1"
+                            value="10"
+                        >
+
+                        <label for="compoundFrequency">
+                            Compounding frequency
+                        </label>
+
+                        <select id="compoundFrequency">
+                            <option value="1">Annually</option>
+                            <option value="2">Semi-annually</option>
+                            <option value="4">Quarterly</option>
+                            <option value="12" selected>Monthly</option>
+                            <option value="365">Daily</option>
+                        </select>
+
+                        <button
+                            class="gold-button full-width"
+                            id="calculateCompound"
+                        >
+                            Calculate
+                        </button>
+
+                        <div
+                            class="calculator-result"
+                            id="compoundResult"
+                        >
+                            —
+                        </div>
+
+                    </article>
+
+
+                    <!-- Simple interest -->
+
+                    <article class="panel calculator-panel">
+
+                        <div class="calculator-title">
+                            <i class="fa-solid fa-coins"></i>
+                            <h2>Simple Interest</h2>
+                        </div>
+
+                        <label for="simplePrincipal">
+                            Principal amount
+                        </label>
+
+                        <input
+                            type="number"
+                            id="simplePrincipal"
+                            min="0"
+                            step="any"
+                            value="1000"
+                        >
+
+                        <label for="simpleRate">
+                            Annual interest rate (%)
+                        </label>
+
+                        <input
+                            type="number"
+                            id="simpleRate"
+                            min="0"
+                            step="any"
+                            value="5"
+                        >
+
+                        <label for="simpleYears">
+                            Years
+                        </label>
+
+                        <input
+                            type="number"
+                            id="simpleYears"
+                            min="0"
+                            step="any"
+                            value="5"
+                        >
+
+                        <button
+                            class="gold-button full-width"
+                            id="calculateSimple"
+                        >
+                            Calculate
+                        </button>
+
+                        <div
+                            class="calculator-result"
+                            id="simpleResult"
+                        >
+                            —
+                        </div>
+
+                    </article>
 
-<div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th>COUNTRY</th>
-<th>INDICATOR</th>
-<th>VALUE</th>
-<th>DATE</th>
-<th>SOURCE</th>
-</tr>
-</thead>
-
-<tbody id="archive-table">
-<tr><td colspan="5">Waiting for records…</td></tr>
-</tbody>
-</table>
+
+                    <!-- Inflation calculator -->
+
+                    <article class="panel calculator-panel">
+
+                        <div class="calculator-title">
+                            <i class="fa-solid fa-money-bill-trend-up"></i>
+                            <h2>Inflation Calculator</h2>
+                        </div>
+
+                        <label for="inflationAmount">
+                            Original amount
+                        </label>
+
+                        <input
+                            type="number"
+                            id="inflationAmount"
+                            min="0"
+                            step="any"
+                            value="1000"
+                        >
+
+                        <label for="inflationRateInput">
+                            Annual inflation rate (%)
+                        </label>
+
+                        <input
+                            type="number"
+                            id="inflationRateInput"
+                            step="any"
+                            value="4"
+                        >
+
+                        <label for="inflationYears">
+                            Number of years
+                        </label>
+
+                        <input
+                            type="number"
+                            id="inflationYears"
+                            min="0"
+                            step="any"
+                            value="10"
+                        >
+
+                        <button
+                            class="gold-button full-width"
+                            id="calculateInflation"
+                        >
+                            Calculate
+                        </button>
+
+                        <div
+                            class="calculator-result"
+                            id="inflationResult"
+                        >
+                            —
+                        </div>
+
+                    </article>
+
+
+                    <!-- Future value -->
+
+                    <article class="panel calculator-panel">
+
+                        <div class="calculator-title">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                            <h2>Future Value</h2>
+                        </div>
+
+                        <label for="futurePresentValue">
+                            Present value
+                        </label>
+
+                        <input
+                            type="number"
+                            id="futurePresentValue"
+                            min="0"
+                            step="any"
+                            value="1000"
+                        >
+
+                        <label for="futureRate">
+                            Annual growth rate (%)
+                        </label>
+
+                        <input
+                            type="number"
+                            id="futureRate"
+                            step="any"
+                            value="5"
+                        >
+
+                        <label for="futureYears">
+                            Years
+                        </label>
+
+                        <input
+                            type="number"
+                            id="futureYears"
+                            min="0"
+                            step="any"
+                            value="10"
+                        >
+
+                        <button
+                            class="gold-button full-width"
+                            id="calculateFuture"
+                        >
+                            Calculate
+                        </button>
+
+                        <div
+                            class="calculator-result"
+                            id="futureResult"
+                        >
+                            —
+                        </div>
+
+                    </article>
+
+                </div>
+
+            </section>
+
+
+            <!-- =================================
+                 HISTORICAL ARCHIVE PAGE
+            ================================== -->
+
+            <section
+                class="page-section"
+                id="page-history"
+                data-section="history"
+            >
+
+                <div class="page-heading">
+
+                    <div>
+                        <span class="eyebrow">THE HISTORICAL COLLECTION</span>
+                        <h1>Historical Archive</h1>
+                        <p>
+                            Explore past financial and economic records.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <article class="panel">
+
+                    <div class="history-controls">
+
+                        <label>
+                            Data category
+
+                            <select id="historyCategory">
+                                <option value="currencies">Currencies</option>
+                                <option value="gold">Gold</option>
+                                <option value="bitcoin">Bitcoin</option>
+                                <option value="inflation">Inflation</option>
+                                <option value="gdp">GDP</option>
+                                <option value="unemployment">Unemployment</option>
+                            </select>
+
+                        </label>
+
+                        <label>
+                            Country or currency
+
+                            <input
+                                type="text"
+                                id="historySearch"
+                                placeholder="Search..."
+                            >
+
+                        </label>
+
+                        <label>
+                            Start date
+
+                            <input
+                                type="date"
+                                id="historyStartDate"
+                            >
+
+                        </label>
+
+                        <label>
+                            End date
+
+                            <input
+                                type="date"
+                                id="historyEndDate"
+                            >
+
+                        </label>
+
+                        <button
+                            class="gold-button"
+                            id="searchHistory"
+                        >
+                            Search archive
+                        </button>
+
+                    </div>
+
+                </article>
+
+
+                <article class="panel">
+
+                    <div class="panel-heading">
+                        <h2>Historical Data</h2>
+                    </div>
+
+                    <div class="large-chart-container">
+                        <canvas id="historicalChart"></canvas>
+                    </div>
+
+                    <div class="table-scroll">
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Category</th>
+                                    <th>Value</th>
+                                    <th>Currency / Unit</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="historicalTableBody">
+                                <tr>
+                                    <td colspan="5">
+                                        Select a category and search the archive.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+
+                </article>
+
+            </section>
+
+
+            <!-- =================================
+                 REPORTS PAGE
+            ================================== -->
+
+            <section
+                class="page-section"
+                id="page-reports"
+                data-section="reports"
+            >
+
+                <div class="page-heading">
+
+                    <div>
+                        <span class="eyebrow">FINANCIAL DOCUMENTATION</span>
+                        <h1>Reports</h1>
+                        <p>
+                            Financial summaries and data exports.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="stats-grid">
+
+                    <article class="panel report-card">
+
+                        <i class="fa-solid fa-table"></i>
+
+                        <h2>Currency Report</h2>
+
+                        <p>
+                            Export the currently available currency table.
+                        </p>
+
+                        <button
+                            class="gold-button"
+                            data-export="currencies"
+                        >
+                            Export CSV
+                        </button>
+
+                    </article>
+
+
+                    <article class="panel report-card">
+
+                        <i class="fa-solid fa-chart-line"></i>
+
+                        <h2>Economic Report</h2>
+
+                        <p>
+                            Export available economic indicators.
+                        </p>
+
+                        <button
+                            class="gold-button"
+                            data-export="economy"
+                        >
+                            Export CSV
+                        </button>
+
+                    </article>
+
+
+                    <article class="panel report-card">
+
+                        <i class="fa-solid fa-coins"></i>
+
+                        <h2>Market Report</h2>
+
+                        <p>
+                            Export available market and Bitcoin data.
+                        </p>
+
+                        <button
+                            class="gold-button"
+                            data-export="markets"
+                        >
+                            Export CSV
+                        </button>
+
+                    </article>
+
+                </div>
+
+            </section>
+
+
+            <!-- =================================
+                 SETTINGS PAGE
+            ================================== -->
+
+            <section
+                class="page-section"
+                id="page-settings"
+                data-section="settings"
+            >
+
+                <div class="page-heading">
+
+                    <div>
+                        <span class="eyebrow">ARCHIVE CONFIGURATION</span>
+                        <h1>Settings</h1>
+                        <p>
+                            Configure display preferences and data behavior.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <article class="panel settings-panel">
+
+                    <h2>Display Preferences</h2>
+
+                    <div class="setting-row">
+
+                        <div>
+                            <strong>Default display currency</strong>
+                            <p>
+                                Select the currency used for monetary values.
+                            </p>
+                        </div>
+
+                        <select id="defaultCurrency">
+                            <option value="USD">USD — US Dollar</option>
+                            <option value="EUR">EUR — Euro</option>
+                            <option value="GBP">GBP — Pound Sterling</option>
+                            <option value="CHF">CHF — Swiss Franc</option>
+                            <option value="PLN">PLN — Polish Zloty</option>
+                            <option value="JPY">JPY — Japanese Yen</option>
+                            <option value="CAD">CAD — Canadian Dollar</option>
+                            <option value="AUD">AUD — Australian Dollar</option>
+                            <option value="CNY">CNY — Chinese Yuan</option>
+                            <option value="INR">INR — Indian Rupee</option>
+                            <option value="BRL">BRL — Brazilian Real</option>
+                            <option value="SEK">SEK — Swedish Krona</option>
+                            <option value="NOK">NOK — Norwegian Krone</option>
+                            <option value="DKK">DKK — Danish Krone</option>
+                            <option value="CZK">CZK — Czech Koruna</option>
+                            <option value="HUF">HUF — Hungarian Forint</option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="setting-row">
+
+                        <div>
+                            <strong>Automatic data refresh</strong>
+                            <p>
+                                Periodically request updated information.
+                            </p>
+                        </div>
+
+                        <label class="switch">
+                            <input
+                                type="checkbox"
+                                id="autoRefreshSetting"
+                                checked
+                            >
+                            <span class="switch-slider"></span>
+                        </label>
+
+                    </div>
+
+
+                    <div class="setting-row">
+
+                        <div>
+                            <strong>Refresh interval</strong>
+                            <p>
+                                Choose the automatic refresh interval.
+                            </p>
+                        </div>
+
+                        <select id="refreshInterval">
+                            <option value="60000">1 minute</option>
+                            <option value="300000" selected>5 minutes</option>
+                            <option value="900000">15 minutes</option>
+                            <option value="1800000">30 minutes</option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="setting-row">
+
+                        <div>
+                            <strong>Animations</strong>
+                            <p>
+                                Enable interface animations.
+                            </p>
+                        </div>
+
+                        <label class="switch">
+                            <input
+                                type="checkbox"
+                                id="animationsSetting"
+                                checked
+                            >
+                            <span class="switch-slider"></span>
+                        </label>
+
+                    </div>
+
+
+                    <div class="setting-row">
+
+                        <div>
+                            <strong>Clear cached data</strong>
+                            <p>
+                                Remove locally cached financial information.
+                            </p>
+                        </div>
+
+                        <button
+                            class="outline-button"
+                            id="clearCache"
+                        >
+                            <i class="fa-solid fa-trash"></i>
+                            Clear cache
+                        </button>
+
+                    </div>
+
+
+                    <div class="setting-row">
+
+                        <div>
+                            <strong>Restore default settings</strong>
+                            <p>
+                                Reset display preferences.
+                            </p>
+                        </div>
+
+                        <button
+                            class="outline-button"
+                            id="resetSettings"
+                        >
+                            Restore defaults
+                        </button>
+
+                    </div>
+
+                </article>
+
+
+                <article class="panel">
+
+                    <h2>Data Sources</h2>
+
+                    <div
+                        class="source-list"
+                        id="dataSourcesList"
+                    >
+
+                        <div class="source-item">
+                            <span>National Bank of Poland</span>
+                            <span>Exchange rates and gold</span>
+                        </div>
+
+                        <div class="source-item">
+                            <span>CoinGecko</span>
+                            <span>Cryptocurrency market data</span>
+                        </div>
+
+                        <div class="source-item">
+                            <span>World Bank</span>
+                            <span>International economic indicators</span>
+                        </div>
+
+                        <div class="source-item">
+                            <span>Eurostat</span>
+                            <span>European economic statistics</span>
+                        </div>
+
+                    </div>
+
+                </article>
+
+            </section>
+
+
+            <!-- =================================
+                 GLOBAL FOOTER
+            ================================== -->
+
+            <footer class="content-footer">
+
+                <div>
+                    THE MONETARY ARCHIVE
+                    <span>INTERNATIONAL FINANCIAL RECORDS</span>
+                </div>
+
+                <div>
+                    <span>Data sources and update times are shown with each dataset.</span>
+                    <span id="footerUpdateTime">Last update: —</span>
+                </div>
+
+            </footer>
+
+        </main>
+
+    </div>
+
 </div>
+
+
+<!-- =========================================
+     NOTIFICATION SYSTEM
+========================================== -->
+
+<div
+    id="notificationContainer"
+    class="notification-container"
+    aria-live="polite"
+></div>
 
-<p class="footnote" id="archive-count">0 records</p>
 
-</article>
-</section>
+<!-- =========================================
+     MODAL WINDOW
+========================================== -->
 
-<footer class="site-footer">
-<b>THE MONETARY ARCHIVE</b>
-<span>PUBLIC DATA · HISTORICAL CONTEXT · GLOBAL ECONOMY</span>
-<span id="footer-time">—</span>
-</footer>
+<div
+    class="modal-backdrop"
+    id="modalBackdrop"
+    hidden
+>
 
-</main>
+    <div
+        class="modal-window"
+        id="modalWindow"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalTitle"
+    >
+
+        <div class="modal-heading">
+
+            <h2 id="modalTitle">Information</h2>
+
+            <button
+                id="closeModal"
+                aria-label="Close dialog"
+            >
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+        </div>
+
+        <div
+            class="modal-content"
+            id="modalContent"
+        ></div>
+
+    </div>
+
 </div>
+
+
+<!-- =========================================
+     APPLICATION STATUS
+========================================== -->
+
+<div
+    class="application-status"
+    id="applicationStatus"
+    aria-live="polite"
+>
+    Initializing archive...
 </div>
+
 </body>
 </html>
