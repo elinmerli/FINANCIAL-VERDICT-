@@ -1,761 +1,547 @@
-/* ============================================================
-   THE MONETARY ARCHIVE
-   globe.js — Interactive 3D World Globe
-   Version: 1.0.0
-   ============================================================ */
 
-(() => {
+/* =========================================================
+   THE MONETARY ARCHIVE
+   INTERACTIVE 3D GLOBE
+   ========================================================= */
+
+(function () {
     "use strict";
 
-    /* --------------------------------------------------------
-       CONFIGURATION
-    -------------------------------------------------------- */
-
     const CONFIG = {
-        containerSelector: "#globe-container",
-
-        worldDataUrl:
+        topologyURL:
             "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
 
-        countryNamesUrl:
+        namesURL:
             "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.tsv",
 
-        backgroundColor: "#080b10",
+        countriesURL:
+            "https://restcountries.com/v3.1/all?fields=name,cca2,cca3,currencies,capital,region",
 
-        globeResolution: 3,
+        earthTexture:
+            "https://unpkg.com/three-globe/example/img/earth-night.jpg",
 
-        autoRotate: true,
-        autoRotateSpeed: 0.35,
+        backgroundColor: "#070a10",
 
-        polygonColor: "rgba(181, 145, 83, 0.22)",
-        polygonHoverColor: "rgba(218, 183, 112, 0.75)",
-        polygonSelectedColor: "rgba(218, 183, 112, 0.55)",
+        initialAltitude: 2.25,
+        minimumAltitude: 1.35,
+        maximumAltitude: 5.5,
 
-        polygonSideColor: "rgba(120, 91, 48, 0.35)",
-        polygonStrokeColor: "rgba(193, 157, 94, 0.55)",
-
-        polygonAltitude: 0.012,
-        polygonHoverAltitude: 0.075,
-        polygonSelectedAltitude: 0.045,
-
-        transitionDuration: 250
+        autoRotateSpeed: 0.35
     };
 
 
-    /* --------------------------------------------------------
-       STATE
-    -------------------------------------------------------- */
-
-    let globeInstance = null;
-
-    let countries = [];
-
-    let hoveredCountry = null;
-
+    let globe = null;
+    let polygons = [];
+    let countryIndex = new Map();
     let selectedCountry = null;
-
+    let autoRotate = true;
     let resizeObserver = null;
 
-    let isInitialized = false;
 
+    /* =====================================================
+       COUNTRY DATA
+    ===================================================== */
 
-    /* --------------------------------------------------------
-       DOM ELEMENTS
-    -------------------------------------------------------- */
+    async function fetchText(url) {
+        const response = await fetch(url);
 
-    const container = document.querySelector(
-        CONFIG.containerSelector
-    );
+        if (!response.ok) {
+            throw new Error(`Could not load ${url}`);
+        }
 
-    if (!container) {
-        console.error(
-            "[Monetary Archive] Globe container not found:",
-            CONFIG.containerSelector
-        );
-
-        return;
+        return response.text();
     }
 
 
-    /* --------------------------------------------------------
-       HELPERS
-    -------------------------------------------------------- */
+    async function fetchJSON(url) {
+        const response = await fetch(url);
 
-    function getCountryName(country) {
-        if (!country) {
-            return "Unknown country";
+        if (!response.ok) {
+            throw new Error(`Could not load ${url}`);
         }
 
-        return (
-            country.properties?.name ||
-            country.properties?.NAME ||
-            "Unknown country"
-        );
+        return response.json();
     }
 
 
-    function getCountryId(country) {
-        if (!country) {
-            return null;
-        }
-
-        return country.id || country.properties?.id || null;
+    function normalizeName(value) {
+        return String(value || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "");
     }
 
 
-    function setText(selector, value) {
-        const element = document.querySelector(selector);
+    function parseTSV(text) {
+        const lines = text.trim().split(/\r?\n/);
+        const result = new Map();
 
-        if (element) {
-            element.textContent = value;
-        }
+        lines.slice(1).forEach(function (line) {
+            const columns = line.split("\t");
+
+            if (columns.length < 2) return;
+
+            result.set(
+                String(columns[0]).trim(),
+                String(columns[1]).trim()
+            );
+        });
+
+        return result;
     }
 
 
-    function setLoadingMessage(message) {
-        const loadingElement = document.querySelector(
-            ".globe-loading"
-        );
+    async function loadCountryIndex() {
+        const countries = await fetchJSON(CONFIG.countriesURL);
 
-        if (loadingElement) {
-            loadingElement.textContent = message;
-        }
+        const index = new Map();
+
+        countries.forEach(function (country) {
+            const name = country.name
+                ? country.name.common
+                : "";
+
+            const code = country.cca2 || "";
+
+            if (!name || !code) return;
+
+            index.set(normalizeName(name), {
+                name: name,
+                code: code,
+                alpha3: country.cca3 || "",
+                currencies: country.currencies || {},
+                capital: country.capital || [],
+                region: country.region || ""
+            });
+        });
+
+        const aliases = {
+            "unitedstatesofamerica": "US",
+            "unitedstates": "US",
+            "russia": "RU",
+            "southkorea": "KR",
+            "northkorea": "KP",
+            "ivorycoast": "CI",
+            "czechrepublic": "CZ",
+            "democraticrepublicofthecongo": "CD",
+            "republicofthecongo": "CG",
+            "vietnam": "VN",
+            "syria": "SY",
+            "iran": "IR",
+            "tanzania": "TZ",
+            "bolivia": "BO",
+            "venezuela": "VE",
+            "moldova": "MD",
+            "brunei": "BN",
+            "laos": "LA",
+            "micronesia": "FM",
+            "palestine": "PS"
+        };
+
+        Object.entries(aliases).forEach(function ([name, code]) {
+            const country = countries.find(item => item.cca2 === code);
+
+            if (country) {
+                index.set(name, {
+                    name: country.name.common,
+                    code: country.cca2,
+                    alpha3: country.cca3 || "",
+                    currencies: country.currencies || {},
+                    capital: country.capital || [],
+                    region: country.region || ""
+                });
+            }
+        });
+
+        countryIndex = index;
     }
 
 
-    function hideLoadingMessage() {
-        const loadingElement = document.querySelector(
-            ".globe-loading"
-        );
+    /* =====================================================
+       BUILD GEOGRAPHY
+    ===================================================== */
 
-        if (loadingElement) {
-            loadingElement.style.display = "none";
+    async function loadPolygons() {
+        if (!window.topojson) {
+            throw new Error("TopoJSON library is not available.");
         }
+
+        const [topology, namesText] = await Promise.all([
+            fetchJSON(CONFIG.topologyURL),
+            fetchText(CONFIG.namesURL)
+        ]);
+
+        const names = parseTSV(namesText);
+
+        const countries = window.topojson.feature(
+            topology,
+            topology.objects.countries
+        ).features;
+
+        return countries.map(function (feature) {
+            const id = String(feature.id);
+
+            const name = names.get(id) || `Country ${id}`;
+
+            const normalized = normalizeName(name);
+
+            const profile = countryIndex.get(normalized) || null;
+
+            return {
+                ...feature,
+
+                properties: {
+                    ...(feature.properties || {}),
+                    name: name,
+                    code: profile ? profile.code : null,
+                    alpha3: profile ? profile.alpha3 : null,
+                    currency: profile
+                        ? Object.keys(profile.currencies)[0] || null
+                        : null
+                }
+            };
+        });
     }
 
 
-    function showLoadingMessage() {
-        const loadingElement = document.querySelector(
-            ".globe-loading"
-        );
+    /* =====================================================
+       COUNTRY SELECTION
+    ===================================================== */
 
-        if (loadingElement) {
-            loadingElement.style.display = "block";
-        }
-    }
+    function selectCountry(feature) {
+        if (!feature || !feature.properties) return;
 
+        selectedCountry = feature;
 
-    function getPolygonColor(country) {
-        if (country === selectedCountry) {
-            return CONFIG.polygonSelectedColor;
-        }
+        const properties = feature.properties;
 
-        if (country === hoveredCountry) {
-            return CONFIG.polygonHoverColor;
-        }
-
-        return CONFIG.polygonColor;
-    }
-
-
-    function getPolygonAltitude(country) {
-        if (country === hoveredCountry) {
-            return CONFIG.polygonHoverAltitude;
-        }
-
-        if (country === selectedCountry) {
-            return CONFIG.polygonSelectedAltitude;
-        }
-
-        return CONFIG.polygonAltitude;
-    }
-
-
-    /* --------------------------------------------------------
-       COUNTRY INFORMATION
-    -------------------------------------------------------- */
-
-    function updateCountryInformation(country) {
-        if (!country) {
-            return;
-        }
-
-        const name = getCountryName(country);
-        const id = getCountryId(country);
-
-        /*
-         * These selectors are optional.
-         * If the elements exist in index.html,
-         * their contents will be updated automatically.
-         */
-
-        setText("#selected-country-name", name);
-        setText("#country-name", name);
-        setText("[data-country-name]", name);
-
-        setText("#selected-country-id", id || "—");
-
-
-        /*
-         * Send the selected country to the rest of the website.
-         *
-         * script.js can listen for this event and load
-         * economic indicators for the selected country.
-         */
+        const country = {
+            name: properties.name || "Unknown country",
+            code: properties.code || null,
+            alpha3: properties.alpha3 || null,
+            currency: properties.currency || null
+        };
 
         window.dispatchEvent(
             new CustomEvent("archive:country-selected", {
-                detail: {
-                    id: id,
-                    name: name,
-                    properties: country.properties || {}
-                }
+                detail: country
             })
         );
+
+        if (globe) {
+            globe
+                .polygonCapColor(function (item) {
+                    return item === selectedCountry
+                        ? "rgba(255, 199, 110, 0.85)"
+                        : "rgba(180, 119, 53, 0.22)";
+                });
+        }
     }
 
 
-    /* --------------------------------------------------------
-       COUNTRY SELECTION
-    -------------------------------------------------------- */
+    /* =====================================================
+       GLOBE INITIALIZATION
+    ===================================================== */
 
-    function selectCountry(country) {
-        if (!country) {
-            return;
-        }
+    async function init() {
+        const container = document.getElementById("globe-container");
 
-        selectedCountry = country;
+        if (!container) return;
 
-        updateCountryInformation(country);
-
-        if (globeInstance) {
-            globeInstance
-                .polygonsData(countries)
-                .polygonCapColor(getPolygonColor)
-                .polygonAltitude(getPolygonAltitude);
-        }
-
-        console.info(
-            "[Monetary Archive] Selected country:",
-            getCountryName(country)
-        );
-    }
-
-
-    /* --------------------------------------------------------
-       COUNTRY HOVER
-    -------------------------------------------------------- */
-
-    function handleCountryHover(country) {
-        hoveredCountry = country || null;
-
-        container.style.cursor = country
-            ? "pointer"
-            : "grab";
-
-        if (!globeInstance) {
-            return;
-        }
-
-        globeInstance
-            .polygonCapColor(getPolygonColor)
-            .polygonAltitude(getPolygonAltitude);
-    }
-
-
-    /* --------------------------------------------------------
-       LOAD COUNTRY NAMES
-    -------------------------------------------------------- */
-
-    async function loadCountryNames() {
-        const response = await fetch(
-            CONFIG.countryNamesUrl,
-            {
-                cache: "force-cache"
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(
-                "Could not load country names."
-            );
-        }
-
-        const text = await response.text();
-
-        const lines = text.trim().split(/\r?\n/);
-
-        const names = new Map();
-
-        for (let i = 1; i < lines.length; i++) {
-            const columns = lines[i].split("\t");
-
-            const id = columns[0];
-            const name = columns.slice(1).join("\t");
-
-            if (id && name) {
-                names.set(String(id), name);
-            }
-        }
-
-        return names;
-    }
-
-
-    /* --------------------------------------------------------
-       LOAD WORLD GEOGRAPHY
-    -------------------------------------------------------- */
-
-    async function loadWorldData() {
-        const response = await fetch(
-            CONFIG.worldDataUrl,
-            {
-                cache: "force-cache"
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(
-                "Could not load world map data."
-            );
-        }
-
-        return await response.json();
-    }
-
-
-    /* --------------------------------------------------------
-       PREPARE COUNTRY POLYGONS
-    -------------------------------------------------------- */
-
-    async function prepareCountries() {
-        if (!window.topojson) {
-            throw new Error(
-                "TopoJSON library is missing. Check index.html."
-            );
-        }
-
-        const [worldData, countryNames] = await Promise.all([
-            loadWorldData(),
-            loadCountryNames()
-        ]);
-
-        const countryObject =
-            worldData.objects.countries;
-
-        if (!countryObject) {
-            throw new Error(
-                "Country geometry was not found in world data."
-            );
-        }
-
-        const geoJson = window.topojson.feature(
-            worldData,
-            countryObject
-        );
-
-        countries = geoJson.features.map(country => {
-            const id = String(country.id);
-
-            country.properties = {
-                ...(country.properties || {}),
-
-                id: id,
-
-                name:
-                    countryNames.get(id) ||
-                    country.properties?.name ||
-                    "Unknown country"
-            };
-
-            return country;
-        });
-
-        return countries;
-    }
-
-
-    /* --------------------------------------------------------
-       CREATE GLOBE
-    -------------------------------------------------------- */
-
-    function createGlobe() {
-        if (typeof window.Globe !== "function") {
-            throw new Error(
-                "Globe.gl library is missing. Check index.html."
-            );
-        }
-
-        const width = Math.max(
-            container.clientWidth,
-            300
-        );
-
-        const height = Math.max(
-            container.clientHeight,
-            350
-        );
-
-        globeInstance = window.Globe({
-            animateIn: true,
-            waitForGlobeReady: true
-        })(container);
-
-
-        /* Globe appearance */
-
-        globeInstance
-            .width(width)
-            .height(height)
-
-            .backgroundColor(CONFIG.backgroundColor)
-
-            .showAtmosphere(true)
-            .atmosphereColor("#9a7744")
-            .atmosphereAltitude(0.16)
-
-            .showGraticules(true)
-
-            .globeImageUrl(
-                "https://unpkg.com/three-globe/example/img/earth-night.jpg"
-            )
-
-            .bumpImageUrl(
-                "https://unpkg.com/three-globe/example/img/earth-topology.png"
-            );
-
-
-        /* Country polygons */
-
-        globeInstance
-            .polygonsData(countries)
-
-            .polygonCapColor(getPolygonColor)
-
-            .polygonSideColor(
-                () => CONFIG.polygonSideColor
-            )
-
-            .polygonStrokeColor(
-                () => CONFIG.polygonStrokeColor
-            )
-
-            .polygonAltitude(getPolygonAltitude)
-
-            .polygonLabel(country => {
-                return `
-                    <div class="globe-country-tooltip">
-                        <strong>
-                            ${getCountryName(country)}
-                        </strong>
-                    </div>
-                `;
-            })
-
-            .polygonsTransitionDuration(
-                CONFIG.transitionDuration
-            )
-
-            .onPolygonHover(handleCountryHover)
-
-            .onPolygonClick(selectCountry);
-
-
-        /* Camera and controls */
-
-        const controls = globeInstance.controls();
-
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.08;
-
-        controls.enableZoom = true;
-
-        controls.minDistance = 150;
-        controls.maxDistance = 450;
-
-        controls.autoRotate =
-            CONFIG.autoRotate &&
-            !window.matchMedia(
-                "(prefers-reduced-motion: reduce)"
-            ).matches;
-
-        controls.autoRotateSpeed =
-            CONFIG.autoRotateSpeed;
-
-
-        /* Initial camera position */
-
-        globeInstance.pointOfView(
-            {
-                lat: 25,
-                lng: 10,
-                altitude: 2.4
-            },
-            1000
-        );
-
-
-        /* Renderer quality */
-
-        const renderer = globeInstance.renderer();
-
-        renderer.setPixelRatio(
-            Math.min(window.devicePixelRatio || 1, 2)
-        );
-
-        renderer.setClearColor(
-            CONFIG.backgroundColor,
-            0
-        );
-
-
-        /* Globe is ready */
-
-        globeInstance.onGlobeReady(() => {
-            hideLoadingMessage();
-
-            container.classList.add(
-                "globe-ready"
-            );
-
-            console.info(
-                "[Monetary Archive] Globe successfully initialized."
-            );
-        });
-    }
-
-
-    /* --------------------------------------------------------
-       RESPONSIVE RESIZING
-    -------------------------------------------------------- */
-
-    function handleResize() {
-        if (!globeInstance) {
-            return;
-        }
-
-        const width = Math.max(
-            container.clientWidth,
-            300
-        );
-
-        const height = Math.max(
-            container.clientHeight,
-            350
-        );
-
-        globeInstance
-            .width(width)
-            .height(height);
-    }
-
-
-    function initializeResizeObserver() {
-        if ("ResizeObserver" in window) {
-            resizeObserver = new ResizeObserver(() => {
-                handleResize();
-            });
-
-            resizeObserver.observe(container);
-
-            return;
-        }
-
-        window.addEventListener(
-            "resize",
-            handleResize
-        );
-    }
-
-
-    /* --------------------------------------------------------
-       PUBLIC GLOBE API
-    -------------------------------------------------------- */
-
-    window.ArchiveGlobe = {
-
-        getInstance() {
-            return globeInstance;
-        },
-
-        getCountries() {
-            return countries;
-        },
-
-        getSelectedCountry() {
-            return selectedCountry;
-        },
-
-        selectByName(name) {
-            if (!name) {
-                return false;
-            }
-
-            const country = countries.find(item => {
-                return (
-                    getCountryName(item).toLowerCase() ===
-                    String(name).toLowerCase()
-                );
-            });
-
-            if (!country) {
-                return false;
-            }
-
-            selectCountry(country);
-
-            return true;
-        },
-
-        selectById(id) {
-            if (!id) {
-                return false;
-            }
-
-            const country = countries.find(item => {
-                return getCountryId(item) === String(id);
-            });
-
-            if (!country) {
-                return false;
-            }
-
-            selectCountry(country);
-
-            return true;
-        },
-
-        rotate(enabled = true) {
-            if (!globeInstance) {
-                return;
-            }
-
-            globeInstance.controls().autoRotate =
-                Boolean(enabled);
-        },
-
-        focusCountry(name) {
-            if (!globeInstance) {
-                return false;
-            }
-
-            const country = countries.find(item => {
-                return (
-                    getCountryName(item).toLowerCase() ===
-                    String(name).toLowerCase()
-                );
-            });
-
-            if (!country) {
-                return false;
-            }
-
-            const coordinates =
-                country.geometry?.coordinates;
-
-            if (!coordinates) {
-                return false;
-            }
-
-            selectCountry(country);
-
-            return true;
-        },
-
-        resize() {
-            handleResize();
-        }
-    };
-
-
-    /* --------------------------------------------------------
-       INITIALIZATION
-    -------------------------------------------------------- */
-
-    async function initializeGlobe() {
-        if (isInitialized) {
-            return;
-        }
-
-        isInitialized = true;
-
-        showLoadingMessage();
-
-        setLoadingMessage(
-            "Loading global financial map..."
-        );
+        if (globe) return;
 
         try {
-            await prepareCountries();
-
-            if (!countries.length) {
-                throw new Error(
-                    "No countries were loaded."
-                );
+            if (typeof window.Globe !== "function") {
+                throw new Error("Globe.gl library is not available.");
             }
 
-            setLoadingMessage(
-                "Preparing the interactive globe..."
+            if (!window.topojson) {
+                throw new Error("TopoJSON library is not available.");
+            }
+
+            container.innerHTML = "";
+
+            await loadCountryIndex();
+
+            polygons = await loadPolygons();
+
+            globe = window.Globe({
+                animateIn: true,
+                waitForGlobeReady: true
+            })(container)
+
+                .backgroundColor(CONFIG.backgroundColor)
+
+                .globeImageUrl(CONFIG.earthTexture)
+
+                .showAtmosphere(true)
+
+                .atmosphereColor("#b37b43")
+
+                .atmosphereAltitude(0.18)
+
+                .polygonsData(polygons)
+
+                .polygonCapColor(function (feature) {
+                    return feature === selectedCountry
+                        ? "rgba(255, 199, 110, 0.85)"
+                        : "rgba(180, 119, 53, 0.20)";
+                })
+
+                .polygonSideColor(() => "rgba(90, 56, 27, 0.30)")
+
+                .polygonStrokeColor(() => "rgba(237, 191, 125, 0.38)")
+
+                .polygonAltitude(function (feature) {
+                    return feature === selectedCountry
+                        ? 0.018
+                        : 0.004;
+                })
+
+                .polygonLabel(function (feature) {
+                    const properties = feature.properties || {};
+
+                    return `
+                        <div style="
+                            background:#11141b;
+                            color:#f1e5d0;
+                            border:1px solid #d7a45e;
+                            border-radius:7px;
+                            padding:9px 12px;
+                            font-family:Arial,sans-serif;
+                        ">
+                            <strong style="color:#f1c47d">
+                                ${escapeHTML(properties.name || "Unknown")}
+                            </strong>
+                            <br>
+                            <small>
+                                Click to view country information
+                            </small>
+                        </div>
+                    `;
+                })
+
+                .onPolygonClick(function (feature) {
+                    selectCountry(feature);
+                });
+
+            const controls = globe.controls();
+
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = CONFIG.autoRotateSpeed;
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.08;
+            controls.minDistance = 150;
+            controls.maxDistance = 600;
+
+            globe.pointOfView(
+                {
+                    lat: 25,
+                    lng: 15,
+                    altitude: CONFIG.initialAltitude
+                },
+                1000
             );
 
-            createGlobe();
+            autoRotate = true;
 
-            initializeResizeObserver();
+            installControls();
+            observeSize();
 
-            console.info(
-                `[Monetary Archive] Loaded ${countries.length} countries.`
+            const loading = container.querySelector(".globe-loading");
+
+            if (loading) {
+                loading.remove();
+            }
+
+            window.dispatchEvent(
+                new CustomEvent("archive:globe-ready")
             );
 
         } catch (error) {
-            console.error(
-                "[Monetary Archive] Globe initialization failed:",
-                error
-            );
+            console.error("[ArchiveGlobe]", error);
 
-            setLoadingMessage(
-                "The globe could not be loaded. Please refresh the page."
-            );
+            container.innerHTML = `
+                <div class="globe-loading">
+                    <div>
+                        <strong>Globe unavailable</strong>
+                        <p style="margin-top:8px;color:#92939a">
+                            ${escapeHTML(error.message)}
+                        </p>
+                        <button
+                            id="retryGlobe"
+                            style="
+                                margin-top:14px;
+                                padding:9px 15px;
+                                background:#d7a45e;
+                                color:#111;
+                                border:0;
+                                border-radius:6px;
+                                cursor:pointer;
+                            "
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            `;
 
-            container.classList.add(
-                "globe-error"
-            );
+            const retry = document.getElementById("retryGlobe");
 
-            isInitialized = false;
+            if (retry) {
+                retry.addEventListener("click", function () {
+                    globe = null;
+                    init();
+                });
+            }
         }
     }
 
 
-    /* --------------------------------------------------------
-       START
-    -------------------------------------------------------- */
+    function escapeHTML(value) {
+        return String(value).replace(/[&<>"']/g, function (char) {
+            const entities = {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;"
+            };
 
-    if (document.readyState === "loading") {
-        document.addEventListener(
-            "DOMContentLoaded",
-            initializeGlobe,
-            { once: true }
-        );
-    } else {
-        initializeGlobe();
+            return entities[char];
+        });
     }
 
 
-    /* --------------------------------------------------------
-       CLEANUP
-    -------------------------------------------------------- */
+    /* =====================================================
+       CONTROLS
+    ===================================================== */
 
-    window.addEventListener(
-        "pagehide",
-        () => {
-            if (resizeObserver) {
-                resizeObserver.disconnect();
-            }
+    function installControls() {
+        const zoomIn = document.getElementById("globeZoomIn");
+        const zoomOut = document.getElementById("globeZoomOut");
+        const reset = document.getElementById("globeReset");
+        const rotate = document.getElementById("globeAutoRotate");
 
-            if (globeInstance) {
-                globeInstance._destructor?.();
-            }
+        if (zoomIn) {
+            zoomIn.addEventListener("click", function () {
+                zoom(-0.45);
+            });
+        }
+
+        if (zoomOut) {
+            zoom(0.45);
+        }
+
+        if (zoomOut) {
+            zoomOut.addEventListener("click", function () {
+                zoom(0.45);
+            });
+        }
+
+        if (reset) {
+            reset.addEventListener("click", function () {
+                if (!globe) return;
+
+                globe.pointOfView(
+                    {
+                        lat: 25,
+                        lng: 15,
+                        altitude: CONFIG.initialAltitude
+                    },
+                    900
+                );
+            });
+        }
+
+        if (rotate) {
+            rotate.addEventListener("click", toggleRotation);
+        }
+    }
+
+
+    function zoom(amount) {
+        if (!globe) return;
+
+        const current = globe.pointOfView();
+
+        const nextAltitude = Math.max(
+            CONFIG.minimumAltitude,
+            Math.min(
+                CONFIG.maximumAltitude,
+                current.altitude + amount
+            )
+        );
+
+        globe.pointOfView(
+            {
+                ...current,
+                altitude: nextAltitude
+            },
+            350
+        );
+    }
+
+
+    function toggleRotation() {
+        if (!globe) return;
+
+        autoRotate = !autoRotate;
+
+        globe.controls().autoRotate = autoRotate;
+
+        const button = document.getElementById("globeAutoRotate");
+
+        if (button) {
+            button.classList.toggle("active", autoRotate);
+        }
+    }
+
+
+    /* =====================================================
+       RESIZE
+    ===================================================== */
+
+    function observeSize() {
+        const container = document.getElementById("globe-container");
+
+        if (!container || !globe) return;
+
+        if (resizeObserver) {
+            resizeObserver.disconnect();
+        }
+
+        resizeObserver = new ResizeObserver(function () {
+            if (!globe) return;
+
+            globe.width(container.clientWidth);
+            globe.height(container.clientHeight);
+        });
+
+        resizeObserver.observe(container);
+    }
+
+
+    /* =====================================================
+       PUBLIC API
+    ===================================================== */
+
+    window.ArchiveGlobe = Object.freeze({
+        init: init,
+        selectCountry: selectCountry,
+        toggleRotation: toggleRotation,
+        zoom: zoom,
+
+        getSelectedCountry: function () {
+            return selectedCountry
+                ? selectedCountry.properties
+                : null;
         },
-        { once: true }
-    );
+
+        getGlobe: function () {
+            return globe;
+        }
+    });
 
 })();
