@@ -2,71 +2,12 @@
 (() => {
   "use strict";
 
-  const countryCodes = {
-    "United States of America": "USA",
-    "Poland": "POL",
-    "United Kingdom": "GBR",
-    "Germany": "DEU",
-    "France": "FRA",
-    "Japan": "JPN",
-    "China": "CHN",
-    "India": "IND",
-    "Brazil": "BRA",
-    "Canada": "CAN",
-    "Australia": "AUS",
-    "Switzerland": "CHE",
-    "Spain": "ESP",
-    "Italy": "ITA",
-    "Netherlands": "NLD",
-    "Sweden": "SWE",
-    "Norway": "NOR",
-    "Denmark": "DNK",
-    "South Korea": "KOR",
-    "Mexico": "MEX",
-    "South Africa": "ZAF",
-    "Turkey": "TUR",
-    "Ukraine": "UKR",
-    "Argentina": "ARG",
-    "New Zealand": "NZL",
-    "Ireland": "IRL",
-    "Portugal": "PRT",
-    "Belgium": "BEL",
-    "Austria": "AUT",
-    "Greece": "GRC",
-    "Finland": "FIN",
-    "Iceland": "ISL",
-    "Singapore": "SGP",
-    "Indonesia": "IDN",
-    "Thailand": "THA",
-    "Egypt": "EGY",
-    "Nigeria": "NGA",
-    "Kenya": "KEN",
-    "Chile": "CHL",
-    "Colombia": "COL",
-    "Peru": "PER",
-    "Saudi Arabia": "SAU",
-    "United Arab Emirates": "ARE",
-    "Pakistan": "PAK",
-    "Bangladesh": "BGD",
-    "Vietnam": "VNM",
-    "Malaysia": "MYS",
-    "Romania": "ROU",
-    "Czechia": "CZE",
-    "Hungary": "HUN",
-    "Bulgaria": "BGR",
-    "Croatia": "HRV"
-  };
+  let instance = null;
+  let observer = null;
 
-  let globeInstance = null;
-  let resizeObserver = null;
-
-  async function create(container, onCountryClick) {
+  async function create(container, onSelect) {
     if (typeof window.Globe !== "function") {
-      throw new Error("Globe.gl library did not load");
-    }
-
-    if (!window.topojson) {
-      throw new Error("TopoJSON library did not load");
+      throw new Error("The Globe.gl library did not load. Check your internet connection.");
     }
 
     const response = await fetch(
@@ -74,93 +15,70 @@
     );
 
     if (!response.ok) {
-      throw new Error(`World map request failed: ${response.status}`);
+      throw new Error(`Country map could not load: HTTP ${response.status}`);
     }
 
     const world = await response.json();
-    const features = window.topojson.feature(
+
+    if (!window.topojson || !world.objects?.countries) {
+      throw new Error("The country-boundary data is unavailable.");
+    }
+
+    const countries = window.topojson.feature(
       world,
       world.objects.countries
     ).features;
 
-    if (globeInstance) {
-      globeInstance._destructor?.();
-      globeInstance = null;
-    }
+    destroy();
 
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-
-    globeInstance = window.Globe()(container)
-      .globeImageUrl(
-        "https://unpkg.com/three-globe/example/img/earth-night.jpg"
-      )
-      .bumpImageUrl(
-        "https://unpkg.com/three-globe/example/img/earth-topology.png"
-      )
+    instance = window.Globe()(container)
+      .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-night.jpg")
+      .bumpImageUrl("https://unpkg.com/three-globe/example/img/earth-topology.png")
       .backgroundColor("#101722")
       .showAtmosphere(true)
       .atmosphereColor("#75694e")
-      .atmosphereAltitude(0.13)
-      .polygonsData(features)
-      .polygonCapColor(() => "rgba(165,139,89,0.22)")
-      .polygonSideColor(() => "rgba(90,78,56,0.18)")
-      .polygonStrokeColor(() => "rgba(190,166,119,0.65)")
+      .atmosphereAltitude(0.14)
+      .polygonsData(countries)
+      .polygonCapColor(() => "rgba(165,139,89,0.20)")
+      .polygonSideColor(() => "rgba(100,84,55,0.20)")
+      .polygonStrokeColor(() => "rgba(190,166,119,0.7)")
       .polygonAltitude(0.008)
       .polygonLabel(feature =>
-        `<b>${String(feature.properties?.name || "Country")}</b>`
+        `<span>${String(feature.properties?.name || "Country")}</span>`
       )
       .onPolygonClick(feature => {
         const name = feature.properties?.name || "Unknown country";
-        const code = countryCodes[name] || null;
-
-        if (typeof onCountryClick === "function") {
-          onCountryClick({ name, code, feature });
-        }
+        if (typeof onSelect === "function") onSelect(name);
       });
 
-    const controls = globeInstance.controls();
+    const controls = instance.controls();
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.35;
     controls.enableDamping = true;
 
-    globeInstance.pointOfView({
-      lat: 20,
-      lng: 0,
-      altitude: 2.2
-    }, 0);
+    instance.pointOfView({ lat: 20, lng: 0, altitude: 2.1 }, 0);
 
-    resizeObserver = new ResizeObserver(() => {
-      if (!globeInstance) return;
-      globeInstance
-        .width(container.clientWidth)
-        .height(container.clientHeight);
+    observer = new ResizeObserver(() => {
+      if (!instance) return;
+      instance.width(container.clientWidth);
+      instance.height(container.clientHeight);
     });
+    observer.observe(container);
 
-    resizeObserver.observe(container);
-
-    return globeInstance;
+    return instance;
   }
 
   function destroy() {
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
+    if (observer) {
+      observer.disconnect();
+      observer = null;
     }
 
-    if (globeInstance) {
-      globeInstance._destructor?.();
-      globeInstance = null;
+    if (instance) {
+      try { instance._destructor(); } catch {}
+      instance = null;
     }
   }
 
-  window.ArchiveGlobe = {
-    create,
-    destroy,
-    get instance() {
-      return globeInstance;
-    }
-  };
+  window.ArchiveGlobe = { create, destroy };
 })();
