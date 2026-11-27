@@ -1,154 +1,166 @@
 
-"use strict";
+(() => {
+  "use strict";
 
-window.ArchiveGlobe = (() => {
-  const instances = new Map();
+  const countryCodes = {
+    "United States of America": "USA",
+    "Poland": "POL",
+    "United Kingdom": "GBR",
+    "Germany": "DEU",
+    "France": "FRA",
+    "Japan": "JPN",
+    "China": "CHN",
+    "India": "IND",
+    "Brazil": "BRA",
+    "Canada": "CAN",
+    "Australia": "AUS",
+    "Switzerland": "CHE",
+    "Spain": "ESP",
+    "Italy": "ITA",
+    "Netherlands": "NLD",
+    "Sweden": "SWE",
+    "Norway": "NOR",
+    "Denmark": "DNK",
+    "South Korea": "KOR",
+    "Mexico": "MEX",
+    "South Africa": "ZAF",
+    "Turkey": "TUR",
+    "Ukraine": "UKR",
+    "Argentina": "ARG",
+    "New Zealand": "NZL",
+    "Ireland": "IRL",
+    "Portugal": "PRT",
+    "Belgium": "BEL",
+    "Austria": "AUT",
+    "Greece": "GRC",
+    "Finland": "FIN",
+    "Iceland": "ISL",
+    "Singapore": "SGP",
+    "Indonesia": "IDN",
+    "Thailand": "THA",
+    "Egypt": "EGY",
+    "Nigeria": "NGA",
+    "Kenya": "KEN",
+    "Chile": "CHL",
+    "Colombia": "COL",
+    "Peru": "PER",
+    "Saudi Arabia": "SAU",
+    "United Arab Emirates": "ARE",
+    "Pakistan": "PAK",
+    "Bangladesh": "BGD",
+    "Vietnam": "VNM",
+    "Malaysia": "MYS",
+    "Romania": "ROU",
+    "Czechia": "CZE",
+    "Hungary": "HUN",
+    "Bulgaria": "BGR",
+    "Croatia": "HRV"
+  };
 
-  const WORLD_DATA =
-    "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+  let globeInstance = null;
+  let resizeObserver = null;
 
-  async function create(containerId, options = {}) {
-    const container = document.getElementById(containerId);
-
-    if (!container) return null;
-    if (typeof Globe !== "function" || !window.topojson) {
-      container.innerHTML =
-        '<div class="loading-text">Globe libraries could not be loaded.</div>';
-      return null;
+  async function create(container, onCountryClick) {
+    if (typeof window.Globe !== "function") {
+      throw new Error("Globe.gl library did not load");
     }
 
-    if (instances.has(containerId)) {
-      return instances.get(containerId);
+    if (!window.topojson) {
+      throw new Error("TopoJSON library did not load");
     }
 
-    container.innerHTML = "";
+    const response = await fetch(
+      "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
+    );
 
-    try {
-      const response = await fetch(WORLD_DATA);
-
-      if (!response.ok) {
-        throw new Error("Geographical data unavailable.");
-      }
-
-      const topology = await response.json();
-      const countries = topojson.feature(
-        topology,
-        topology.objects.countries
-      ).features;
-
-      const globe = Globe()(container)
-        .width(container.clientWidth)
-        .height(container.clientHeight)
-        .backgroundColor("#10110f")
-        .showAtmosphere(true)
-        .atmosphereColor("#8b7955")
-        .atmosphereAltitude(0.13)
-        .globeImageUrl(
-          "https://unpkg.com/three-globe/example/img/earth-night.jpg"
-        )
-        .bumpImageUrl(
-          "https://unpkg.com/three-globe/example/img/earth-topology.png"
-        )
-        .polygonsData(countries)
-        .polygonCapColor(() => "rgba(91, 83, 61, 0.18)")
-        .polygonSideColor(() => "rgba(30, 30, 25, 0.65)")
-        .polygonStrokeColor(() => "rgba(183, 159, 111, 0.45)")
-        .polygonAltitude(feature =>
-          feature === selectedCountry ? 0.025 : 0.006
-        )
-        .polygonLabel(feature => {
-          const name = feature.properties?.name || "Unknown country";
-          return `<div style="background:#181916;color:#e4dfd1;padding:9px 12px;border:1px solid #a89568;font-family:serif">${name}</div>`;
-        })
-        .onPolygonClick(feature => {
-          selectedCountry = feature;
-          globe
-            .polygonAltitude(item =>
-              item === selectedCountry ? 0.025 : 0.006
-            );
-
-          if (typeof options.onCountryClick === "function") {
-            options.onCountryClick(feature);
-          }
-        })
-        .onPolygonHover(feature => {
-          globe.polygonCapColor(item =>
-            item === feature
-              ? "rgba(168, 149, 104, 0.65)"
-              : "rgba(91, 83, 61, 0.18)"
-          );
-
-          container.style.cursor = feature ? "pointer" : "grab";
-        });
-
-      let selectedCountry = null;
-
-      globe.controls().autoRotate = true;
-      globe.controls().autoRotateSpeed = 0.35;
-      globe.controls().enableDamping = true;
-      globe.controls().dampingFactor = 0.08;
-      globe.controls().minDistance = 130;
-      globe.controls().maxDistance = 450;
-
-      instances.set(containerId, globe);
-
-      const resize = () => {
-        if (!container.isConnected) return;
-
-        globe
-          .width(container.clientWidth)
-          .height(container.clientHeight);
-      };
-
-      const observer = new ResizeObserver(resize);
-      observer.observe(container);
-
-      if (options.onReady) options.onReady(globe);
-
-      return globe;
-    } catch (error) {
-      console.error("Globe error:", error);
-      container.innerHTML =
-        '<div class="loading-text">Unable to load the globe. Check your internet connection and reload the page.</div>';
-      return null;
+    if (!response.ok) {
+      throw new Error(`World map request failed: ${response.status}`);
     }
-  }
 
-  function get(containerId) {
-    return instances.get(containerId) || null;
-  }
+    const world = await response.json();
+    const features = window.topojson.feature(
+      world,
+      world.objects.countries
+    ).features;
 
-  function reset(containerId) {
-    const globe = get(containerId);
-    if (!globe) return;
+    if (globeInstance) {
+      globeInstance._destructor?.();
+      globeInstance = null;
+    }
 
-    globe.pointOfView({
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+      resizeObserver = null;
+    }
+
+    globeInstance = window.Globe()(container)
+      .globeImageUrl(
+        "https://unpkg.com/three-globe/example/img/earth-night.jpg"
+      )
+      .bumpImageUrl(
+        "https://unpkg.com/three-globe/example/img/earth-topology.png"
+      )
+      .backgroundColor("#101722")
+      .showAtmosphere(true)
+      .atmosphereColor("#75694e")
+      .atmosphereAltitude(0.13)
+      .polygonsData(features)
+      .polygonCapColor(() => "rgba(165,139,89,0.22)")
+      .polygonSideColor(() => "rgba(90,78,56,0.18)")
+      .polygonStrokeColor(() => "rgba(190,166,119,0.65)")
+      .polygonAltitude(0.008)
+      .polygonLabel(feature =>
+        `<b>${String(feature.properties?.name || "Country")}</b>`
+      )
+      .onPolygonClick(feature => {
+        const name = feature.properties?.name || "Unknown country";
+        const code = countryCodes[name] || null;
+
+        if (typeof onCountryClick === "function") {
+          onCountryClick({ name, code, feature });
+        }
+      });
+
+    const controls = globeInstance.controls();
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.35;
+    controls.enableDamping = true;
+
+    globeInstance.pointOfView({
       lat: 20,
       lng: 0,
       altitude: 2.2
-    }, 900);
+    }, 0);
+
+    resizeObserver = new ResizeObserver(() => {
+      if (!globeInstance) return;
+      globeInstance
+        .width(container.clientWidth)
+        .height(container.clientHeight);
+    });
+
+    resizeObserver.observe(container);
+
+    return globeInstance;
   }
 
-  function zoom(containerId, direction) {
-    const globe = get(containerId);
-    if (!globe) return;
+  function destroy() {
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+      resizeObserver = null;
+    }
 
-    const current = globe.pointOfView();
-    const altitude = Math.max(
-      0.8,
-      Math.min(4, current.altitude - direction * 0.3)
-    );
-
-    globe.pointOfView({
-      ...current,
-      altitude
-    }, 400);
+    if (globeInstance) {
+      globeInstance._destructor?.();
+      globeInstance = null;
+    }
   }
 
-  return {
+  window.ArchiveGlobe = {
     create,
-    get,
-    reset,
-    zoom
+    destroy,
+    get instance() {
+      return globeInstance;
+    }
   };
 })();
