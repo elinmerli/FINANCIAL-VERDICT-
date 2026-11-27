@@ -1,49 +1,75 @@
+THE MONETARY ARCHIVE
+====================
 
-# THE MONETARY ARCHIVE
+PROJECT STRUCTURE
 
-International financial and economic information archive.
+The Monetary Archive/
+│
+├── index.html
+├── styles.css
+├── data.js
+├── script.js
+├── globe.js
+└── README.md
 
-## Files
 
-- index.html — website structure and separate sections
-- styles.css — visual design and responsive layout
-- data.js — public data sources and calculations
-- globe.js — interactive 3D globe
-- script.js — navigation, charts, tables and calculators
+IMPORTANT
 
-## Installation
+This is a single-page application.
 
-1. Create a repository on GitHub.
-2. Upload all five files into the same repository folder.
-3. Make sure the file names are exactly:
-   - index.html
-   - styles.css
-   - data.js
-   - globe.js
-   - script.js
-4. Open repository Settings.
-5. Find Pages.
-6. Select Deploy from a branch.
-7. Select the main branch and root folder.
-8. Save and wait for GitHub Pages to publish the website.
+All navigation takes place inside index.html.
+The sidebar does not redirect the user to separate HTML pages.
 
-## Data sources
 
-- National Bank of Poland: currency reference rates and gold prices.
-- CoinGecko: Bitcoin market data and historical prices.
-- World Bank Open Data: GDP growth, inflation, unemployment and population.
-- Natural Earth: country boundary geometry for the globe.
+HOW TO START
 
-## Important data notes
+1. Put all files into one folder.
 
-- NBP exchange rates are reference rates, not live trading quotes.
-- NBP gold prices are published reference prices, not guaranteed market execution prices.
-- CoinGecko data availability and update frequency depend on its public API.
-- World Bank indicators may have different latest observation years.
-- Missing observations are displayed as unavailable rather than fabricated.
+2. Install Visual Studio Code.
 
-## Requirements
+3. Install the Live Server extension.
 
-A modern browser and an internet connection are required.
-The site uses public APIs and third-party libraries loaded from CDNs.
-No personal API key is configured in this version.
+4. Open the project folder in Visual Studio Code.
+
+5. Right-click index.html.
+
+6. Select Open with Live Server.
+
+
+DATA SOURCES
+
+NBP:
+https://api.nbp.pl/
+
+CoinGecko:
+https://www.coingecko.com/
+
+Frankfurter:
+https://www.frankfurter.dev/
+
+World Bank:
+https://data.worldbank.org/
+
+
+IMPORTANT DATA NOTES
+
+Some APIs have request limits.
+
+Some indicators are updated daily.
+Macroeconomic data may be updated quarterly or annually.
+
+Unavailable data is shown as unavailable.
+The application does not intentionally create fake financial quotes.
+
+
+TECHNOLOGY
+
+HTML
+CSS
+JavaScript
+Chart.js
+Globe.gl
+World Bank API
+NBP API
+CoinGecko API
+Frankfurter API
