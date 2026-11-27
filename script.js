@@ -1,139 +1,244 @@
 /* ============================================================
    THE MONETARY ARCHIVE
-   Main application controller
+   MAIN APPLICATION ENGINE
    Version: 1.0.0
+
+   Responsibilities:
+   - Dashboard initialization
+   - Currency selection and conversion
+   - Bitcoin market data
+   - Gold price display
+   - Economic indicators
+   - Charts
+   - Tables and filters
+   - Navigation
+   - Financial calculators
+   - CSV export
+   - Automatic refresh
+   - Error handling
    ============================================================ */
 
 (() => {
     "use strict";
 
+
     /* ========================================================
-       1. CONFIGURATION
-       ======================================================== */
+       01. CONFIGURATION
+    ======================================================== */
 
     const CONFIG = {
+
+        defaultCurrency: "USD",
+
         refreshInterval: 5 * 60 * 1000,
-        clockInterval: 1000,
-        chartAnimation: false,
-        locale: "en-GB",
-        currency: "PLN",
-        maximumTableRows: 500
-    };
 
-    const PAGE_NAMES = {
-        overview: "Overview",
-        statistics: "Statistics",
-        inflation: "Inflation",
-        calculator: "Calculator",
-        markets: "Markets",
-        archive: "Historical archive"
-    };
+        bitcoinRefreshInterval: 60 * 1000,
 
-    const CURRENCY_NAMES = {
-        USD: "US dollar",
-        EUR: "Euro",
-        GBP: "British pound",
-        CHF: "Swiss franc",
-        JPY: "Japanese yen",
-        CAD: "Canadian dollar",
-        AUD: "Australian dollar",
-        CZK: "Czech koruna",
-        SEK: "Swedish krona",
-        NOK: "Norwegian krone",
-        DKK: "Danish krone",
-        HUF: "Hungarian forint"
-    };
+        bitcoinHistoryDays: 30,
 
-    const COUNTRY_NAMES = {
-        PL: "Poland",
-        US: "United States",
-        EU: "European Union"
-    };
+        bitcoinApi:
+            "https://api.coingecko.com/api/v3",
 
-    const state = {
-        dashboard: null,
-        observations: [],
-        currencies: [],
-        gold: null,
-        inflation: [],
-        history: {},
-        sources: {},
-        errors: [],
-        charts: {},
-        currentPage: "overview",
-        selectedObservation: null,
-        lastSuccessfulLoad: null,
-        loading: false,
-        refreshTimer: null,
-        historyRequestId: 0
+        chartColors: {
+            gold: "#c5a46d",
+            green: "#79a88b",
+            red: "#bd7777",
+            blue: "#7895b8",
+            muted: "#8c8a83",
+            grid: "rgba(197, 164, 109, 0.12)"
+        },
+
+        currencies: [
+            "USD",
+            "EUR",
+            "GBP",
+            "CHF",
+            "JPY",
+            "CAD",
+            "AUD",
+            "PLN",
+            "CZK",
+            "SEK",
+            "NOK",
+            "DKK",
+            "HUF"
+        ],
+
+        currencyNames: {
+            USD: "US Dollar",
+            EUR: "Euro",
+            GBP: "British Pound",
+            CHF: "Swiss Franc",
+            JPY: "Japanese Yen",
+            CAD: "Canadian Dollar",
+            AUD: "Australian Dollar",
+            PLN: "Polish Zloty",
+            CZK: "Czech Koruna",
+            SEK: "Swedish Krona",
+            NOK: "Norwegian Krone",
+            DKK: "Danish Krone",
+            HUF: "Hungarian Forint"
+        },
+
+        countryNames: {
+            PL: "Poland",
+            US: "United States",
+            EU: "European Union"
+        },
+
+        chartDefaults: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 500
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: "#11151c",
+                    titleColor: "#d8c29a",
+                    bodyColor: "#f0eee8",
+                    borderColor: "rgba(197, 164, 109, 0.35)",
+                    borderWidth: 1,
+                    padding: 12
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: "#8c8a83"
+                    }
+                },
+                y: {
+                    grid: {
+                        color: "rgba(197, 164, 109, 0.10)"
+                    },
+                    ticks: {
+                        color: "#8c8a83"
+                    }
+                }
+            }
+        }
     };
 
 
     /* ========================================================
-       2. DOM HELPERS
-       ======================================================== */
+       02. APPLICATION STATE
+    ======================================================== */
 
-    const $ = (selector, root = document) =>
-        root.querySelector(selector);
+    const state = {
 
-    const $$ = (selector, root = document) =>
-        Array.from(root.querySelectorAll(selector));
+        dashboard: null,
 
-    function byId(id) {
-        return document.getElementById(id);
+        selectedCurrency: CONFIG.defaultCurrency,
+
+        selectedCountry: "PL",
+
+        selectedPeriod: 30,
+
+        bitcoin: null,
+
+        bitcoinHistory: null,
+
+        charts: {},
+
+        lastDashboardUpdate: null,
+
+        lastBitcoinUpdate: null,
+
+        isLoading: false,
+
+        isRefreshing: false,
+
+        errors: [],
+
+        activeSection: "overview"
+    };
+
+
+    /* ========================================================
+       03. DOM HELPERS
+    ======================================================== */
+
+    function $(selector, parent = document) {
+        return parent.querySelector(selector);
     }
 
-    function setText(id, value) {
-        const element = byId(id);
+
+    function $all(selector, parent = document) {
+        return Array.from(
+            parent.querySelectorAll(selector)
+        );
+    }
+
+
+    function setText(selector, value) {
+        const element = $(selector);
 
         if (element) {
-            element.textContent =
-                value === null || value === undefined || value === ""
-                    ? "—"
-                    : String(value);
+            element.textContent = value;
         }
     }
 
-    function setHTML(id, html) {
-        const element = byId(id);
+
+    function setHTML(selector, value) {
+        const element = $(selector);
 
         if (element) {
-            element.innerHTML = html;
+            element.innerHTML = value;
         }
     }
+
+
+    function setValue(selector, value) {
+        const element = $(selector);
+
+        if (element) {
+            element.value = value;
+        }
+    }
+
 
     function showElement(element) {
         if (element) {
-            element.classList.remove("hidden");
+            element.style.display = "";
         }
     }
+
 
     function hideElement(element) {
         if (element) {
-            element.classList.add("hidden");
+            element.style.display = "none";
         }
     }
 
-    function setStatus(elementOrId, text, type = "neutral") {
-        const element =
-            typeof elementOrId === "string"
-                ? byId(elementOrId)
-                : elementOrId;
 
-        if (!element) return;
-
-        element.textContent = text;
-
-        element.classList.remove(
-            "status-neutral",
-            "status-loading",
-            "status-success",
-            "status-error",
-            "status-warning"
+    function isNumber(value) {
+        return (
+            typeof value === "number" &&
+            Number.isFinite(value)
         );
-
-        element.classList.add(`status-${type}`);
     }
+
+
+    function safeArray(value) {
+        return Array.isArray(value) ? value : [];
+    }
+
+
+    function safeNumber(value, fallback = null) {
+        const number = Number(value);
+
+        return Number.isFinite(number)
+            ? number
+            : fallback;
+    }
+
 
     function escapeHTML(value) {
         return String(value ?? "").replace(
@@ -148,669 +253,862 @@
         );
     }
 
-    function isValidNumber(value) {
-        return (
-            value !== null &&
-            value !== undefined &&
-            value !== "" &&
-            Number.isFinite(Number(value))
+
+    function dispatchEvent(name, detail = {}) {
+        window.dispatchEvent(
+            new CustomEvent(name, {
+                detail
+            })
         );
     }
 
-    function toNumber(value) {
-        if (!isValidNumber(value)) return null;
 
-        const number = Number(value);
+    /* ========================================================
+       04. NOTIFICATIONS AND STATUS
+    ======================================================== */
 
-        return Number.isFinite(number) ? number : null;
-    }
+    function showNotification(message, type = "info") {
+        let container = $("#archive-notifications");
 
-    function firstDefined(...values) {
-        return values.find(
-            value => value !== undefined && value !== null
-        );
-    }
+        if (!container) {
+            container = document.createElement("div");
 
-    function formatNumber(value, decimals = 2) {
-        const number = toNumber(value);
+            container.id = "archive-notifications";
 
-        if (number === null) return "—";
+            container.className = "archive-notifications";
 
-        return new Intl.NumberFormat(CONFIG.locale, {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals
-        }).format(number);
-    }
-
-    function formatMoney(value, currency = "PLN") {
-        const number = toNumber(value);
-
-        if (number === null) return "—";
-
-        try {
-            return new Intl.NumberFormat(CONFIG.locale, {
-                style: "currency",
-                currency,
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 4
-            }).format(number);
-        } catch {
-            return `${formatNumber(number, 2)} ${currency}`;
+            document.body.appendChild(container);
         }
+
+        const notification = document.createElement("div");
+
+        notification.className =
+            `archive-notification archive-notification-${type}`;
+
+        notification.textContent = message;
+
+        container.appendChild(notification);
+
+        requestAnimationFrame(() => {
+            notification.classList.add("visible");
+        });
+
+        window.setTimeout(() => {
+            notification.classList.remove("visible");
+
+            window.setTimeout(() => {
+                notification.remove();
+            }, 300);
+
+        }, 4500);
     }
 
-    function formatPercent(value) {
-        const number = toNumber(value);
 
-        if (number === null) return "—";
+    function setLoading(isLoading) {
+        state.isLoading = isLoading;
 
-        return `${formatNumber(number, 2)}%`;
+        document.body.classList.toggle(
+            "archive-loading",
+            isLoading
+        );
+
+        $all("[data-loading]").forEach(element => {
+            element.classList.toggle(
+                "is-loading",
+                isLoading
+            );
+        });
     }
 
-    function formatDate(value) {
-        if (!value) return "—";
 
-        const date = new Date(value);
+    function updateConnectionStatus(status, message) {
+        const element = $(
+            "#connection-status, [data-connection-status]"
+        );
+
+        if (!element) {
+            return;
+        }
+
+        element.dataset.status = status;
+
+        element.textContent = message;
+    }
+
+
+    function updateLastUpdated(date) {
+        if (!date) {
+            return;
+        }
+
+        const formatted = formatDateTime(date);
+
+        setText("#last-updated", formatted);
+
+        setText("[data-last-updated]", formatted);
+    }
+
+
+    /* ========================================================
+       05. DATE AND NUMBER FORMATTING
+    ======================================================== */
+
+    function formatDate(dateValue) {
+        if (!dateValue) {
+            return "—";
+        }
+
+        const date = new Date(dateValue);
 
         if (Number.isNaN(date.getTime())) {
-            return String(value);
+            return "—";
         }
 
-        return new Intl.DateTimeFormat(CONFIG.locale, {
+        return new Intl.DateTimeFormat("en-GB", {
             day: "2-digit",
             month: "short",
             year: "numeric"
         }).format(date);
     }
 
-    function formatDateTime(value) {
-        if (!value) return "—";
 
-        const date = new Date(value);
-
-        if (Number.isNaN(date.getTime())) {
-            return String(value);
+    function formatDateTime(dateValue) {
+        if (!dateValue) {
+            return "—";
         }
 
-        return new Intl.DateTimeFormat(CONFIG.locale, {
+        const date = new Date(dateValue);
+
+        if (Number.isNaN(date.getTime())) {
+            return "—";
+        }
+
+        return new Intl.DateTimeFormat("en-GB", {
             day: "2-digit",
             month: "short",
             year: "numeric",
             hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
+            minute: "2-digit"
         }).format(date);
     }
 
 
-    /* ========================================================
-       3. DATA NORMALIZATION
-       ======================================================== */
-
-    function getObservationValue(item) {
-        return toNumber(firstDefined(
-            item?.value,
-            item?.rate,
-            item?.mid,
-            item?.price,
-            item?.amount,
-            item?.observation
-        ));
-    }
-
-    function getObservationDate(item) {
-        return firstDefined(
-            item?.date,
-            item?.observationDate,
-            item?.observation_date,
-            item?.period,
-            item?.year,
-            item?.time
-        ) ?? null;
-    }
-
-    function getObservationName(item) {
-        return firstDefined(
-            item?.name,
-            item?.indicator,
-            item?.label,
-            item?.title,
-            item?.description,
-            item?.code
-        ) ?? "Unnamed indicator";
-    }
-
-    function getObservationCountry(item) {
-        const country = firstDefined(
-            item?.country,
-            item?.countryCode,
-            item?.country_code,
-            item?.geo
-        );
-
-        if (!country) return "—";
-
-        return COUNTRY_NAMES[country] || country;
-    }
-
-    function getObservationSource(item) {
-        return firstDefined(
-            item?.source,
-            item?.provider,
-            item?.institution
-        ) ?? "Unknown source";
-    }
-
-    function getObservationCategory(item) {
-        const category = String(
-            firstDefined(
-                item?.category,
-                item?.type,
-                item?.group
-            ) ?? ""
-        ).toLowerCase();
-
-        if (category.includes("inflation") || category.includes("cpi")) {
-            return "inflation";
+    function formatNumber(value, digits = 2) {
+        if (!isNumber(value)) {
+            return "—";
         }
 
-        if (category.includes("gold")) {
-            return "gold";
-        }
-
-        if (category.includes("currency") || category.includes("exchange")) {
-            return "currency";
-        }
-
-        if (category.includes("econom") || category.includes("gdp")) {
-            return "economy";
-        }
-
-        return category || "other";
+        return new Intl.NumberFormat("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: digits
+        }).format(value);
     }
 
-    function normalizeCurrency(item) {
-        if (!item || typeof item !== "object") return null;
 
-        const code = String(
-            firstDefined(item.code, item.currency, item.currencyCode, "")
-        ).toUpperCase();
-
-        const rate = toNumber(
-            firstDefined(item.rate, item.mid, item.value, item.price)
-        );
-
-        if (!code || rate === null) return null;
-
-        return {
-            code,
-            name: firstDefined(
-                item.name,
-                item.currencyName,
-                CURRENCY_NAMES[code],
-                code
-            ),
-            rate,
-            date: getObservationDate(item),
-            source: getObservationSource(item)
-        };
-    }
-
-    function normalizeObservation(item) {
-        if (!item || typeof item !== "object") return null;
-
-        const value = getObservationValue(item);
-
-        if (value === null) return null;
-
-        return {
-            name: getObservationName(item),
-            country: firstDefined(
-                item.countryCode,
-                item.country_code,
-                item.geo,
-                item.country,
-                "—"
-            ),
-            countryName: getObservationCountry(item),
-            value,
-            unit: firstDefined(item.unit, item.unitLabel, "—"),
-            date: getObservationDate(item),
-            source: getObservationSource(item),
-            category: getObservationCategory(item),
-            description: firstDefined(
-                item.description,
-                item.note,
-                ""
-            ),
-            raw: item
-        };
-    }
-
-    function normalizeArray(value) {
-        if (Array.isArray(value)) return value;
-
-        if (value && typeof value === "object") {
-            return Object.values(value);
+    function formatPercent(value) {
+        if (!isNumber(value)) {
+            return "—";
         }
 
-        return [];
+        const sign = value > 0 ? "+" : "";
+
+        return `${sign}${formatNumber(value, 2)}%`;
     }
 
-    function normalizeDashboard(dashboard) {
-        if (!dashboard || typeof dashboard !== "object") {
-            throw new Error("The data source returned an invalid response.");
+
+    function formatCurrency(value, currency = state.selectedCurrency) {
+        if (!isNumber(value)) {
+            return "—";
         }
 
-        const currenciesRaw = normalizeArray(
-            dashboard.currencies
-        );
+        try {
+            return new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(value);
 
-        const observationsRaw = normalizeArray(
-            dashboard.observations
-        );
+        } catch {
+            return `${formatNumber(value)} ${currency}`;
+        }
+    }
 
-        const currencies = currenciesRaw
-            .map(normalizeCurrency)
-            .filter(Boolean);
 
-        const observations = observationsRaw
-            .map(normalizeObservation)
-            .filter(Boolean);
+    function formatCompactCurrency(value) {
+        if (!isNumber(value)) {
+            return "—";
+        }
 
-        const history =
-            dashboard.history && typeof dashboard.history === "object"
-                ? dashboard.history
-                : {};
+        try {
+            return new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: state.selectedCurrency,
+                notation: "compact",
+                maximumFractionDigits: 2
+            }).format(value);
 
-        const sources =
-            dashboard.sources && typeof dashboard.sources === "object"
-                ? dashboard.sources
-                : {};
-
-        return {
-            original: dashboard,
-            currencies,
-            observations,
-            history,
-            sources,
-            errors: normalizeArray(dashboard.errors),
-            gold: dashboard.gold ?? null,
-            inflation: dashboard.inflation ?? null,
-            generatedAt: dashboard.generatedAt ?? null,
-            lastCheckedAt: dashboard.lastCheckedAt ?? null
-        };
+        } catch {
+            return formatCurrency(value);
+        }
     }
 
 
     /* ========================================================
-       4. DATA ENGINE
-       ======================================================== */
+       06. CURRENCY CONVERSION
+    ======================================================== */
 
-    function getDataEngine() {
+    function getCurrencyRates() {
+        return safeArray(
+            state.dashboard?.currencies
+        );
+    }
+
+
+    function getPLNRate(currency) {
+        if (currency === "PLN") {
+            return 1;
+        }
+
+        const rate = getCurrencyRates().find(item => {
+            return item.code === currency;
+        });
+
+        return rate
+            ? safeNumber(rate.value)
+            : null;
+    }
+
+
+    /*
+     * NBP values represent PLN for one unit of foreign currency.
+     *
+     * Example:
+     * 1 USD = 4 PLN
+     * 1 EUR = 4.3 PLN
+     *
+     * To convert USD to EUR:
+     * USD amount * USD PLN rate / EUR PLN rate.
+     */
+
+    function convertCurrency(
+        amount,
+        fromCurrency,
+        toCurrency
+    ) {
+        const value = safeNumber(amount);
+
+        if (value === null) {
+            return null;
+        }
+
+        if (fromCurrency === toCurrency) {
+            return value;
+        }
+
+        const fromRate = getPLNRate(fromCurrency);
+
+        const toRate = getPLNRate(toCurrency);
+
+        if (
+            fromRate === null ||
+            toRate === null ||
+            toRate === 0
+        ) {
+            return null;
+        }
+
+        const amountInPLN = value * fromRate;
+
+        return amountInPLN / toRate;
+    }
+
+
+    function convertFromPLN(amount, currency) {
+        return convertCurrency(
+            amount,
+            "PLN",
+            currency
+        );
+    }
+
+
+    function convertToPLN(amount, currency) {
+        return convertCurrency(
+            amount,
+            currency,
+            "PLN"
+        );
+    }
+
+
+    function getCurrencySymbol(currency) {
+        try {
+            return new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency
+            })
+                .formatToParts(0)
+                .find(part => part.type === "currency")
+                ?.value || currency;
+
+        } catch {
+            return currency;
+        }
+    }
+
+
+    /* ========================================================
+       07. CURRENCY SELECTOR
+    ======================================================== */
+
+    function initializeCurrencySelector() {
+        const selectors = $all(
+            "#currency-select, " +
+            "#display-currency, " +
+            "[data-currency-selector]"
+        );
+
+        selectors.forEach(selector => {
+            if (selector.dataset.initialized === "true") {
+                return;
+            }
+
+            selector.dataset.initialized = "true";
+
+            if (!selector.options.length) {
+                selector.innerHTML = CONFIG.currencies
+                    .map(currency => {
+                        const name =
+                            CONFIG.currencyNames[currency] ||
+                            currency;
+
+                        return `
+                            <option value="${currency}">
+                                ${currency} — ${name}
+                            </option>
+                        `;
+                    })
+                    .join("");
+            }
+
+            selector.value = state.selectedCurrency;
+
+            selector.addEventListener("change", () => {
+                changeCurrency(selector.value);
+            });
+        });
+    }
+
+
+    function changeCurrency(currency) {
+        const code = String(currency || "").toUpperCase();
+
+        if (!CONFIG.currencies.includes(code)) {
+            showNotification(
+                "This display currency is not supported.",
+                "warning"
+            );
+
+            return;
+        }
+
+        state.selectedCurrency = code;
+
+        $all(
+            "#currency-select, " +
+            "#display-currency, " +
+            "[data-currency-selector]"
+        ).forEach(selector => {
+            selector.value = code;
+        });
+
+        localStorage.setItem(
+            "archive-display-currency",
+            code
+        );
+
+        renderDashboard();
+
+        renderBitcoin();
+
+        renderCurrencyTable();
+
+        renderGold();
+
+        updateCalculatorCurrency();
+
+        dispatchEvent("archive:currency-changed", {
+            currency: code
+        });
+    }
+
+
+    function restoreCurrencyPreference() {
+        try {
+            const saved = localStorage.getItem(
+                "archive-display-currency"
+            );
+
+            if (
+                saved &&
+                CONFIG.currencies.includes(saved)
+            ) {
+                state.selectedCurrency = saved;
+            }
+
+        } catch (error) {
+            console.warn(
+                "[Archive] Currency preference unavailable:",
+                error
+            );
+        }
+    }
+
+
+    /* ========================================================
+       08. LOAD MAIN DATA
+    ======================================================== */
+
+    async function loadMainData(force = false) {
         if (!window.ArchiveData) {
             throw new Error(
-                "ArchiveData was not found. Check that data.js loads before script.js."
+                "ArchiveData is not available. Check data.js."
             );
         }
 
         if (typeof window.ArchiveData.loadDashboard !== "function") {
             throw new Error(
-                "The data engine does not contain loadDashboard()."
+                "ArchiveData.loadDashboard() is missing."
             );
         }
 
-        return window.ArchiveData;
+        const dashboard = await window.ArchiveData.loadDashboard({
+            force
+        });
+
+        if (!dashboard) {
+            throw new Error(
+                "The data provider returned an empty dashboard."
+            );
+        }
+
+        state.dashboard = dashboard;
+
+        state.lastDashboardUpdate =
+            dashboard.lastCheckedAt ||
+            dashboard.generatedAt ||
+            new Date().toISOString();
+
+        updateLastUpdated(state.lastDashboardUpdate);
+
+        return dashboard;
     }
 
-    async function loadDashboard(options = {}) {
-        if (state.loading && !options.force) {
+
+    /* ========================================================
+       09. BITCOIN DATA
+    ======================================================== */
+
+    async function requestBitcoinData(endpoint) {
+        const response = await fetch(
+            `${CONFIG.bitcoinApi}${endpoint}`,
+            {
+                method: "GET",
+                headers: {
+                    Accept: "application/json"
+                },
+                cache: "no-store"
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `Bitcoin data request failed: HTTP ${response.status}`
+            );
+        }
+
+        return response.json();
+    }
+
+
+    async function loadBitcoin() {
+        const currencies = [
+            "usd",
+            "eur",
+            "gbp",
+            "pln",
+            "chf",
+            "jpy",
+            "cad",
+            "aud"
+        ];
+
+        const currencyList = currencies.join(",");
+
+        const data = await requestBitcoinData(
+            `/simple/price?ids=bitcoin&vs_currencies=${currencyList}&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`
+        );
+
+        const bitcoin = data?.bitcoin;
+
+        if (!bitcoin) {
+            throw new Error(
+                "Bitcoin price data is unavailable."
+            );
+        }
+
+        state.bitcoin = bitcoin;
+
+        state.lastBitcoinUpdate = new Date().toISOString();
+
+        renderBitcoin();
+
+        return bitcoin;
+    }
+
+
+    function getBitcoinPrice(currency) {
+        if (!state.bitcoin) {
+            return null;
+        }
+
+        const key = currency.toLowerCase();
+
+        const directPrice = safeNumber(
+            state.bitcoin[key]
+        );
+
+        if (directPrice !== null) {
+            return directPrice;
+        }
+
+        const usdPrice = safeNumber(
+            state.bitcoin.usd
+        );
+
+        if (usdPrice === null) {
+            return null;
+        }
+
+        return convertCurrency(
+            usdPrice,
+            "USD",
+            currency
+        );
+    }
+
+
+    function getBitcoinChange() {
+        if (!state.bitcoin) {
+            return null;
+        }
+
+        const key =
+            `${state.selectedCurrency.toLowerCase()}_24h_change`;
+
+        return safeNumber(
+            state.bitcoin[key]
+        );
+    }
+
+
+    function renderBitcoin() {
+        if (!state.bitcoin) {
             return;
         }
 
-        state.loading = true;
+        const currency = state.selectedCurrency;
 
-        setStatus(
-            "connection-status",
-            "Updating",
-            "loading"
+        const price = getBitcoinPrice(currency);
+
+        const change = getBitcoinChange();
+
+        const marketCap = safeNumber(
+            state.bitcoin[
+                `${currency.toLowerCase()}_market_cap`
+            ]
         );
 
-        setStatus(
-            "sidebar-system-status",
-            "Checking",
-            "loading"
-        );
-
-        try {
-            const engine = getDataEngine();
-
-            if (options.force && typeof engine.clearCache === "function") {
-                engine.clearCache();
-            }
-
-            const result = await engine.loadDashboard();
-
-            const normalized = normalizeDashboard(result);
-
-            state.dashboard = normalized.original;
-            state.currencies = normalized.currencies;
-            state.observations = normalized.observations;
-            state.history = normalized.history;
-            state.sources = normalized.sources;
-            state.errors = normalized.errors;
-            state.gold = normalized.gold;
-            state.inflation = normalized.inflation;
-
-            state.lastSuccessfulLoad = new Date();
-
-            renderEverything();
-
-            const hasData =
-                state.currencies.length > 0 ||
-                state.observations.length > 0 ||
-                state.gold !== null;
-
-            setStatus(
-                "connection-status",
-                hasData ? "Connected" : "No data",
-                hasData ? "success" : "warning"
-            );
-
-            setStatus(
-                "sidebar-system-status",
-                hasData ? "Operational" : "Limited",
-                hasData ? "success" : "warning"
-            );
-
-            setText(
-                "last-update-time",
-                formatDateTime(
-                    normalized.lastCheckedAt ||
-                    normalized.generatedAt ||
-                    state.lastSuccessfulLoad
-                )
-            );
-
-            setText(
-                "overview-data-date",
-                `Checked: ${formatDateTime(
-                    normalized.lastCheckedAt ||
-                    normalized.generatedAt ||
-                    state.lastSuccessfulLoad
-                )}`
-            );
-
-            setText(
-                "source-monitor-status",
-                hasData ? "Sources checked" : "No observations"
-            );
-
-            if (state.errors.length > 0) {
-                console.warn(
-                    "[Monetary Archive] Data source warnings:",
-                    state.errors
-                );
-            }
-
-        } catch (error) {
-            console.error(
-                "[Monetary Archive] Data loading failed:",
-                error
-            );
-
-            setStatus(
-                "connection-status",
-                "Connection error",
-                "error"
-            );
-
-            setStatus(
-                "sidebar-system-status",
-                "Unavailable",
-                "error"
-            );
-
-            setText(
-                "overview-data-date",
-                "Data unavailable"
-            );
-
-            showDataError(error.message);
-
-        } finally {
-            state.loading = false;
-        }
-    }
-
-    function showDataError(message) {
-        const target = byId("overview-chart-note");
-
-        if (target) {
-            target.textContent =
-                `Data could not be loaded: ${message}`;
-        }
-
-        setText(
-            "statistics-table-status",
-            "Source unavailable"
+        const volume = safeNumber(
+            state.bitcoin[
+                `${currency.toLowerCase()}_24h_vol`
+            ]
         );
 
         setText(
-            "archive-status",
-            "Source unavailable"
+            "#bitcoin-price",
+            formatCurrency(price, currency)
         );
+
+        setText(
+            "#btc-price",
+            formatCurrency(price, currency)
+        );
+
+        setText(
+            "#bitcoin-change",
+            formatPercent(change)
+        );
+
+        setText(
+            "#bitcoin-market-cap",
+            formatCompactCurrency(marketCap)
+        );
+
+        setText(
+            "#bitcoin-volume",
+            formatCompactCurrency(volume)
+        );
+
+        setText(
+            "#bitcoin-updated",
+            formatDateTime(state.lastBitcoinUpdate)
+        );
+
+        const changeElements = $all(
+            "#bitcoin-change, " +
+            "[data-bitcoin-change]"
+        );
+
+        changeElements.forEach(element => {
+            element.classList.remove(
+                "positive",
+                "negative",
+                "neutral"
+            );
+
+            element.classList.add(
+                change > 0
+                    ? "positive"
+                    : change < 0
+                        ? "negative"
+                        : "neutral"
+            );
+        });
     }
 
 
     /* ========================================================
-       5. NAVIGATION
-       ======================================================== */
+       10. BITCOIN HISTORY
+    ======================================================== */
 
-    function navigateTo(pageName) {
-        if (!PAGE_NAMES[pageName]) return;
+    async function loadBitcoinHistory(days = 30) {
+        const currency =
+            state.selectedCurrency.toLowerCase();
 
-        state.currentPage = pageName;
+        const data = await requestBitcoinData(
+            `/coins/bitcoin/market_chart?vs_currency=${currency}&days=${days}&interval=daily`
+        );
 
-        $$(".nav-link").forEach(button => {
-            const active =
-                button.dataset.page === pageName;
+        if (!Array.isArray(data.prices)) {
+            throw new Error(
+                "Bitcoin historical prices are unavailable."
+            );
+        }
 
-            button.classList.toggle("active", active);
+        state.bitcoinHistory = data.prices.map(item => ({
+            timestamp: item[0],
+            date: new Date(item[0]),
+            price: item[1]
+        }));
 
-            if (active) {
-                button.setAttribute("aria-current", "page");
-            } else {
-                button.removeAttribute("aria-current");
-            }
+        renderBitcoinChart();
+
+        return state.bitcoinHistory;
+    }
+
+
+    function renderBitcoinChart() {
+        const canvas = $(
+            "#bitcoin-chart, " +
+            "#btc-chart, " +
+            "[data-chart='bitcoin']"
+        );
+
+        if (!canvas || !window.Chart) {
+            return;
+        }
+
+        const history = safeArray(
+            state.bitcoinHistory
+        );
+
+        if (!history.length) {
+            return;
+        }
+
+        const labels = history.map(item => {
+            return new Intl.DateTimeFormat("en-US", {
+                day: "2-digit",
+                month: "short"
+            }).format(item.date);
         });
 
-        $$(".page-section").forEach(section => {
-            const active =
-                section.dataset.section === pageName;
+        const values = history.map(item => item.price);
 
-            section.classList.toggle("active", active);
-        });
+        createChart(
+            "bitcoin",
+            canvas,
+            {
+                type: "line",
 
-        setText(
-            "breadcrumb-current",
-            PAGE_NAMES[pageName]
-        );
+                data: {
+                    labels,
 
-        closeMobileSidebar();
+                    datasets: [{
+                        label: `Bitcoin (${state.selectedCurrency})`,
 
-        if (pageName === "statistics") {
-            renderStatistics();
-        }
+                        data: values,
 
-        if (pageName === "inflation") {
-            renderInflation();
-        }
+                        borderColor: CONFIG.chartColors.gold,
 
-        if (pageName === "markets") {
-            renderMarkets();
-        }
+                        backgroundColor:
+                            "rgba(197, 164, 109, 0.10)",
 
-        if (pageName === "archive") {
-            renderArchive();
-        }
+                        borderWidth: 2,
 
-        if (pageName === "overview") {
-            renderOverview();
-        }
-    }
+                        fill: true,
 
-    function openMobileSidebar() {
-        const sidebar = byId("sidebar");
-        const overlay = byId("sidebar-overlay");
+                        tension: 0.35,
 
-        sidebar?.classList.add("open");
-        overlay?.classList.add("visible");
+                        pointRadius: 0,
 
-        document.body.classList.add("sidebar-open");
-    }
+                        pointHoverRadius: 4
+                    }]
+                },
 
-    function closeMobileSidebar() {
-        const sidebar = byId("sidebar");
-        const overlay = byId("sidebar-overlay");
+                options: {
+                    ...CONFIG.chartDefaults,
 
-        sidebar?.classList.remove("open");
-        overlay?.classList.remove("visible");
+                    interaction: {
+                        intersect: false,
+                        mode: "index"
+                    },
 
-        document.body.classList.remove("sidebar-open");
-    }
+                    scales: {
+                        ...CONFIG.chartDefaults.scales,
 
+                        y: {
+                            ...CONFIG.chartDefaults.scales.y,
 
-    /* ========================================================
-       6. CLOCK
-       ======================================================== */
+                            ticks: {
+                                color: "#8c8a83",
 
-    function updateClock() {
-        const now = new Date();
-
-        setText(
-            "live-clock",
-            new Intl.DateTimeFormat(CONFIG.locale, {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                hour12: false
-            }).format(now)
+                                callback(value) {
+                                    return formatCurrency(
+                                        value,
+                                        state.selectedCurrency
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         );
     }
 
 
     /* ========================================================
-       7. OVERVIEW
-       ======================================================== */
+       11. GOLD DATA
+    ======================================================== */
 
-    function findCurrency(code) {
-        return state.currencies.find(
-            currency => currency.code === code
-        ) || null;
-    }
+    function getGoldPrice() {
+        const gold = state.dashboard?.gold;
 
-    function getGoldValue() {
-        if (!state.gold) return null;
-
-        if (typeof state.gold === "number") {
-            return state.gold;
+        if (!gold) {
+            return null;
         }
 
-        return toNumber(
-            firstDefined(
-                state.gold.price,
-                state.gold.value,
-                state.gold.rate,
-                state.gold.gold,
-                state.gold.mid
+        const pricePLN = safeNumber(gold.value);
+
+        if (pricePLN === null) {
+            return null;
+        }
+
+        return convertFromPLN(
+            pricePLN,
+            state.selectedCurrency
+        );
+    }
+
+
+    function renderGold() {
+        const gold = state.dashboard?.gold;
+
+        if (!gold) {
+            setText("#gold-price", "Unavailable");
+            return;
+        }
+
+        const pricePerGram = getGoldPrice();
+
+        const pricePerOunce = pricePerGram === null
+            ? null
+            : pricePerGram * 31.1034768;
+
+        setText(
+            "#gold-price",
+            formatCurrency(
+                pricePerGram,
+                state.selectedCurrency
+            )
+        );
+
+        setText(
+            "#gold-gram-price",
+            formatCurrency(
+                pricePerGram,
+                state.selectedCurrency
+            )
+        );
+
+        setText(
+            "#gold-ounce-price",
+            formatCurrency(
+                pricePerOunce,
+                state.selectedCurrency
+            )
+        );
+
+        setText(
+            "#gold-date",
+            formatDate(gold.date)
+        );
+
+        setText(
+            "[data-gold-price]",
+            formatCurrency(
+                pricePerGram,
+                state.selectedCurrency
             )
         );
     }
 
-    function findInflation(countryCode) {
-        const observations = state.observations.filter(item => {
-            return (
-                item.category === "inflation" &&
-                item.country === countryCode
-            );
-        });
 
-        observations.sort((a, b) => {
-            return String(b.date).localeCompare(String(a.date));
-        });
+    /* ========================================================
+       12. CURRENCY TABLE
+    ======================================================== */
 
-        return observations[0] || null;
-    }
-
-    function renderOverview() {
-        const usd = findCurrency("USD");
-        const eur = findCurrency("EUR");
-        const gold = getGoldValue();
-
-        const usInflation = findInflation("US");
-
-        setText(
-            "overview-usd",
-            usd ? formatMoney(usd.rate) : "—"
+    function renderCurrencyTable() {
+        const tableBody = $(
+            "#currency-table-body, " +
+            "#currencies-table-body, " +
+            "[data-currency-table-body]"
         );
 
-        setText(
-            "overview-eur",
-            eur ? formatMoney(eur.rate) : "—"
-        );
+        if (!tableBody) {
+            return;
+        }
 
-        setText(
-            "overview-gold",
-            gold !== null ? formatMoney(gold) : "—"
-        );
+        const rates = getCurrencyRates();
 
-        setText(
-            "overview-us-inflation",
-            usInflation ? formatPercent(usInflation.value) : "—"
-        );
-
-        setText(
-            "usd-status",
-            usd ? formatDate(usd.date) : "Unavailable"
-        );
-
-        setText(
-            "eur-status",
-            eur ? formatDate(eur.date) : "Unavailable"
-        );
-
-        setText(
-            "gold-status",
-            gold !== null ? "Official quotation" : "Unavailable"
-        );
-
-        setText(
-            "us-inflation-status",
-            usInflation ? formatDate(usInflation.date) : "Unavailable"
-        );
-
-        renderOverviewTable();
-        renderOverviewChart();
-        renderSourceMonitor();
-    }
-
-    function renderOverviewTable() {
-        const body = byId("overview-recent-table");
-
-        if (!body) return;
-
-        const records = [...state.observations]
-            .sort((a, b) =>
-                String(b.date).localeCompare(String(a.date))
-            )
-            .slice(0, 8);
-
-        if (!records.length) {
-            body.innerHTML = `
+        if (!rates.length) {
+            tableBody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="table-empty">
-                        No official observations are currently available.
+                    <td colspan="5">
+                        Currency data is currently unavailable.
                     </td>
                 </tr>
             `;
@@ -818,1193 +1116,1005 @@
             return;
         }
 
-        body.innerHTML = records.map(item => `
-            <tr>
-                <td>${escapeHTML(item.name)}</td>
-                <td>${escapeHTML(item.countryName)}</td>
-                <td>${escapeHTML(formatNumber(item.value, 2))}</td>
-                <td>${escapeHTML(formatDate(item.date))}</td>
-                <td>${escapeHTML(item.source)}</td>
-                <td>
-                    <span class="status status-success">
-                        Published
-                    </span>
-                </td>
-            </tr>
-        `).join("");
-    }
-
-    function renderSourceMonitor() {
-        const sourceElements = {
-            NBP: "source-nbp-status",
-            Eurostat: "source-eurostat-status",
-            WorldBank: "source-worldbank-status",
-            "World Bank": "source-worldbank-status"
-        };
-
-        Object.entries(sourceElements).forEach(([key, id]) => {
-            const source = state.sources[key];
-
-            if (!source) return;
-
-            const status = firstDefined(
-                source.status,
-                source.state,
-                source.message
-            );
-
-            if (status) {
-                setText(id, status);
-            }
-        });
-    }
-
-    function getHistoryPoints(value) {
-        if (Array.isArray(value)) {
-            return value;
-        }
-
-        if (value && Array.isArray(value.data)) {
-            return value.data;
-        }
-
-        if (value && Array.isArray(value.rates)) {
-            return value.rates;
-        }
-
-        return [];
-    }
-
-    function renderOverviewChart() {
-        if (typeof Chart === "undefined") return;
-
-        const canvas = byId("overview-chart");
-
-        if (!canvas) return;
-
-        const usdPoints = getHistoryPoints(
-            state.history.USD
+        const selectedRate = getPLNRate(
+            state.selectedCurrency
         );
 
-        const eurPoints = getHistoryPoints(
-            state.history.EUR
-        );
+        const rows = rates.map(rate => {
+            const code = rate.code;
 
-        const usdMap = new Map(
-            usdPoints.map(point => [
-                getObservationDate(point),
-                getObservationValue(point)
-            ])
-        );
+            const valuePLN = safeNumber(rate.value);
 
-        const eurMap = new Map(
-            eurPoints.map(point => [
-                getObservationDate(point),
-                getObservationValue(point)
-            ])
-        );
+            const converted = valuePLN !== null &&
+                selectedRate !== null
+                    ? valuePLN / selectedRate
+                    : null;
 
-        const dates = Array.from(
-            new Set([
-                ...usdMap.keys(),
-                ...eurMap.keys()
-            ])
-        )
-            .filter(Boolean)
-            .sort();
+            return `
+                <tr>
+                    <td>
+                        <strong>${escapeHTML(code)}</strong>
+                    </td>
 
-        if (!dates.length) {
-            setText(
-                "overview-chart-note",
-                "No historical currency observations are currently available."
-            );
+                    <td>
+                        ${escapeHTML(
+                            CONFIG.currencyNames[code] || code
+                        )}
+                    </td>
 
-            return;
-        }
+                    <td>
+                        ${formatNumber(valuePLN, 4)} PLN
+                    </td>
 
-        createChart("overview", canvas, {
-            type: "line",
+                    <td>
+                        ${converted === null
+                            ? "—"
+                            : formatNumber(converted, 4) +
+                              " " +
+                              escapeHTML(state.selectedCurrency)}
+                    </td>
 
-            data: {
-                labels: dates.map(formatDate),
-
-                datasets: [
-                    {
-                        label: "USD / PLN",
-                        data: dates.map(date =>
-                            usdMap.get(date) ?? null
-                        ),
-                        borderColor: "#b99a65",
-                        backgroundColor: "rgba(185,154,101,0.08)",
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        tension: 0.25,
-                        spanGaps: true
-                    },
-                    {
-                        label: "EUR / PLN",
-                        data: dates.map(date =>
-                            eurMap.get(date) ?? null
-                        ),
-                        borderColor: "#9a5360",
-                        backgroundColor: "rgba(154,83,96,0.08)",
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        tension: 0.25,
-                        spanGaps: true
-                    }
-                ]
-            },
-
-            options: standardChartOptions("PLN")
+                    <td>
+                        ${escapeHTML(rate.date || "—")}
+                    </td>
+                </tr>
+            `;
         });
 
-        setText(
-            "overview-chart-note",
-            `${dates.length} historical observations available.`
-        );
+        tableBody.innerHTML = rows.join("");
     }
 
 
     /* ========================================================
-       8. CHART ENGINE
-       ======================================================== */
+       13. ECONOMIC INDICATORS
+    ======================================================== */
 
-    function standardChartOptions(axisLabel = "") {
-        return {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: CONFIG.chartAnimation,
+    function getLatestObservation(
+        country,
+        category,
+        indicator
+    ) {
+        const observations = safeArray(
+            state.dashboard?.observations
+        );
 
-            interaction: {
-                intersect: false,
-                mode: "index"
-            },
+        return observations
+            .filter(item => {
+                const countryMatches =
+                    item.country === country;
 
-            plugins: {
-                legend: {
-                    display: false
-                },
+                const categoryMatches =
+                    !category ||
+                    item.category === category;
 
-                tooltip: {
-                    backgroundColor: "#171310",
-                    titleColor: "#e8dfd0",
-                    bodyColor: "#c6bba9",
-                    borderColor: "rgba(185,154,101,0.25)",
-                    borderWidth: 1,
-                    padding: 12
-                }
-            },
+                const indicatorMatches =
+                    !indicator ||
+                    item.indicator === indicator;
 
-            scales: {
-                x: {
-                    grid: {
-                        color: "rgba(185,154,101,0.07)"
-                    },
-
-                    ticks: {
-                        color: "#928779",
-                        maxTicksLimit: 8
-                    }
-                },
-
-                y: {
-                    grid: {
-                        color: "rgba(185,154,101,0.07)"
-                    },
-
-                    ticks: {
-                        color: "#928779"
-                    },
-
-                    title: {
-                        display: Boolean(axisLabel),
-                        text: axisLabel,
-                        color: "#928779"
-                    }
-                }
-            }
-        };
+                return (
+                    countryMatches &&
+                    categoryMatches &&
+                    indicatorMatches
+                );
+            })
+            .sort((a, b) => {
+                return String(b.date).localeCompare(
+                    String(a.date)
+                );
+            })[0] || null;
     }
 
-    function createChart(name, canvas, configuration) {
-        if (typeof Chart === "undefined" || !canvas) {
+
+    function renderEconomicIndicators() {
+        const inflation = getLatestObservation(
+            "PL",
+            "inflation"
+        );
+
+        const gdp = getLatestObservation(
+            "PL",
+            "economy"
+        );
+
+        const europeanInflation = getLatestObservation(
+            "EU",
+            "inflation"
+        );
+
+        setText(
+            "#inflation-value",
+            inflation
+                ? formatPercent(inflation.value)
+                : "—"
+        );
+
+        setText(
+            "#gdp-value",
+            gdp
+                ? formatPercent(gdp.value)
+                : "—"
+        );
+
+        setText(
+            "#eu-inflation-value",
+            europeanInflation
+                ? formatPercent(europeanInflation.value)
+                : "—"
+        );
+
+        setText(
+            "#inflation-date",
+            formatDate(inflation?.date)
+        );
+
+        setText(
+            "#gdp-date",
+            formatDate(gdp?.date)
+        );
+    }
+
+
+    function renderObservationTable() {
+        const body = $(
+            "#economic-table-body, " +
+            "[data-economic-table-body]"
+        );
+
+        if (!body) {
+            return;
+        }
+
+        const observations = safeArray(
+            state.dashboard?.observations
+        );
+
+        if (!observations.length) {
+            body.innerHTML = `
+                <tr>
+                    <td colspan="6">
+                        No economic observations available.
+                    </td>
+                </tr>
+            `;
+
+            return;
+        }
+
+        body.innerHTML = observations.map(item => `
+            <tr>
+                <td>${escapeHTML(item.countryName || item.country)}</td>
+
+                <td>${escapeHTML(item.name || item.indicator)}</td>
+
+                <td>${escapeHTML(item.category || "—")}</td>
+
+                <td>${formatNumber(item.value, 3)}</td>
+
+                <td>${escapeHTML(item.unit || "—")}</td>
+
+                <td>${escapeHTML(item.date || "—")}</td>
+            </tr>
+        `).join("");
+    }
+
+
+    /* ========================================================
+       14. DASHBOARD RENDERER
+    ======================================================== */
+
+    function renderDashboard() {
+        if (!state.dashboard) {
+            return;
+        }
+
+        renderCurrencyTable();
+
+        renderGold();
+
+        renderEconomicIndicators();
+
+        renderObservationTable();
+
+        renderBitcoin();
+
+        renderSourceStatus();
+
+        updateLastUpdated(
+            state.lastDashboardUpdate
+        );
+
+        dispatchEvent("archive:dashboard-rendered", {
+            dashboard: state.dashboard,
+            currency: state.selectedCurrency
+        });
+    }
+
+
+    /* ========================================================
+       15. DATA SOURCE STATUS
+    ======================================================== */
+
+    function renderSourceStatus() {
+        const container = $(
+            "#source-status-list, " +
+            "[data-source-status-list]"
+        );
+
+        if (!container) {
+            return;
+        }
+
+        const sources = safeArray(
+            state.dashboard?.sources
+        );
+
+        if (!sources.length) {
+            container.textContent =
+                "Source status is unavailable.";
+
+            return;
+        }
+
+        container.innerHTML = sources.map(source => {
+            const status = source.status || "unknown";
+
+            const statusLabel =
+                status === "online"
+                    ? "Online"
+                    : status === "error"
+                        ? "Unavailable"
+                        : "Unknown";
+
+            return `
+                <div class="source-status-item">
+                    <span class="source-name">
+                        ${escapeHTML(source.name)}
+                    </span>
+
+                    <span class="source-indicator ${escapeHTML(status)}">
+                        ${statusLabel}
+                    </span>
+
+                    <span class="source-time">
+                        ${formatDateTime(source.checkedAt)}
+                    </span>
+
+                    ${source.error
+                        ? `<small>${escapeHTML(source.error)}</small>`
+                        : ""}
+                </div>
+            `;
+        }).join("");
+    }
+
+
+    /* ========================================================
+       16. CHART MANAGEMENT
+    ======================================================== */
+
+    function createChart(name, canvas, config) {
+        if (!window.Chart || !canvas) {
             return null;
         }
 
         if (state.charts[name]) {
             state.charts[name].destroy();
+
+            state.charts[name] = null;
         }
 
         state.charts[name] = new Chart(
-            canvas.getContext("2d"),
-            configuration
+            canvas,
+            config
         );
 
         return state.charts[name];
     }
 
 
-    /* ========================================================
-       9. STATISTICS
-       ======================================================== */
-
-    function getFilteredStatistics() {
-        const search = (
-            byId("statistics-search")?.value || ""
-        ).trim().toLowerCase();
-
-        const country =
-            byId("statistics-country")?.value || "all";
-
-        const category =
-            byId("statistics-category")?.value || "all";
-
-        const source =
-            byId("statistics-source")?.value || "all";
-
-        return state.observations.filter(item => {
-            const searchable = [
-                item.name,
-                item.countryName,
-                item.country,
-                item.source,
-                item.category,
-                item.unit,
-                item.date
-            ].join(" ").toLowerCase();
-
-            if (search && !searchable.includes(search)) {
-                return false;
-            }
-
-            if (
-                country !== "all" &&
-                item.country !== country
-            ) {
-                return false;
-            }
-
-            if (
-                category !== "all" &&
-                item.category !== category
-            ) {
-                return false;
-            }
-
-            if (
-                source !== "all" &&
-                item.source.toLowerCase() !== source.toLowerCase()
-            ) {
-                return false;
-            }
-
-            return true;
-        });
-    }
-
-    function renderStatistics() {
-        const records = getFilteredStatistics();
-
-        const countries = new Set(
-            state.observations.map(item => item.country)
-        );
-
-        const sources = new Set(
-            state.observations.map(item => item.source)
-        );
-
-        setText(
-            "statistics-count",
-            state.observations.length
-        );
-
-        setText(
-            "statistics-countries",
-            countries.size
-        );
-
-        setText(
-            "statistics-sources",
-            sources.size
-        );
-
-        setText(
-            "statistics-table-status",
-            `${records.length} records`
-        );
-
-        setText(
-            "statistics-results-count",
-            `${records.length} matching observations`
-        );
-
-        renderStatisticsTable(records);
-    }
-
-    function renderStatisticsTable(records) {
-        const body = byId("statistics-table-body");
-
-        if (!body) return;
-
-        if (!records.length) {
-            body.innerHTML = `
-                <tr>
-                    <td colspan="6" class="table-empty">
-                        No observations match the selected filters.
-                    </td>
-                </tr>
-            `;
-
+    async function loadCurrencyChart(currency = "USD") {
+        if (!window.ArchiveData) {
             return;
         }
 
-        body.innerHTML = records
-            .slice(0, CONFIG.maximumTableRows)
-            .map((item, index) => `
-                <tr
-                    class="selectable-row"
-                    data-observation-index="${index}"
-                    tabindex="0"
-                >
-                    <td>${escapeHTML(item.name)}</td>
-                    <td>${escapeHTML(item.countryName)}</td>
-                    <td>${escapeHTML(formatNumber(item.value, 2))}</td>
-                    <td>${escapeHTML(item.unit)}</td>
-                    <td>${escapeHTML(formatDate(item.date))}</td>
-                    <td>${escapeHTML(item.source)}</td>
-                </tr>
-            `).join("");
-
-        $$("#statistics-table-body tr[data-observation-index]")
-            .forEach(row => {
-                const selectRow = () => {
-                    const index = Number(
-                        row.dataset.observationIndex
-                    );
-
-                    selectObservation(records[index]);
-                };
-
-                row.addEventListener("click", selectRow);
-
-                row.addEventListener("keydown", event => {
-                    if (
-                        event.key === "Enter" ||
-                        event.key === " "
-                    ) {
-                        event.preventDefault();
-                        selectRow();
-                    }
-                });
-            });
-    }
-
-    function selectObservation(item) {
-        if (!item) return;
-
-        state.selectedObservation = item;
-
-        const container = byId("statistics-detail");
-
-        if (!container) return;
-
-        container.innerHTML = `
-            <div class="stack">
-                <div>
-                    <div class="panel-kicker">Indicator</div>
-                    <h3 class="panel-title">
-                        ${escapeHTML(item.name)}
-                    </h3>
-                </div>
-
-                <div class="stat-value">
-                    ${escapeHTML(formatNumber(item.value, 3))}
-                </div>
-
-                <div class="source-list">
-                    <div class="source-item">
-                        <div>
-                            <div class="source-name">Country</div>
-                            <div class="source-description">
-                                ${escapeHTML(item.countryName)}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="source-item">
-                        <div>
-                            <div class="source-name">Unit</div>
-                            <div class="source-description">
-                                ${escapeHTML(item.unit)}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="source-item">
-                        <div>
-                            <div class="source-name">Observation date</div>
-                            <div class="source-description">
-                                ${escapeHTML(formatDate(item.date))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="source-item">
-                        <div>
-                            <div class="source-name">Original source</div>
-                            <div class="source-description">
-                                ${escapeHTML(item.source)}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                ${
-                    item.description
-                        ? `<div class="notice">
-                            <div class="notice-text">
-                                ${escapeHTML(item.description)}
-                            </div>
-                           </div>`
-                        : ""
-                }
-            </div>
-        `;
-    }
-
-
-    /* ========================================================
-       10. INFLATION
-       ======================================================== */
-
-    function getInflationRecords() {
-        return state.observations.filter(
-            item => item.category === "inflation"
-        );
-    }
-
-    function renderInflation() {
-        const records = getInflationRecords();
-
-        const latestByCountry = {};
-
-        records.forEach(item => {
-            const country = item.country;
-
-            if (
-                !latestByCountry[country] ||
-                String(item.date) >
-                String(latestByCountry[country].date)
-            ) {
-                latestByCountry[country] = item;
-            }
-        });
-
-        setText(
-            "inflation-poland",
-            latestByCountry.PL
-                ? formatPercent(latestByCountry.PL.value)
-                : "—"
+        const canvas = $(
+            "#currency-chart, " +
+            "[data-chart='currency']"
         );
 
-        setText(
-            "inflation-us",
-            latestByCountry.US
-                ? formatPercent(latestByCountry.US.value)
-                : "—"
-        );
-
-        setText(
-            "inflation-eu",
-            latestByCountry.EU
-                ? formatPercent(latestByCountry.EU.value)
-                : "—"
-        );
-
-        renderInflationTable(records);
-        renderInflationChart(latestByCountry);
-    }
-
-    function renderInflationTable(records) {
-        const body = byId("inflation-table-body");
-
-        if (!body) return;
-
-        if (!records.length) {
-            body.innerHTML = `
-                <tr>
-                    <td colspan="5" class="table-empty">
-                        No official inflation observations are available.
-                    </td>
-                </tr>
-            `;
-
+        if (!canvas) {
             return;
         }
-
-        body.innerHTML = records.map(item => `
-            <tr>
-                <td>${escapeHTML(item.countryName)}</td>
-                <td>${escapeHTML(item.name)}</td>
-                <td>${escapeHTML(formatPercent(item.value))}</td>
-                <td>${escapeHTML(formatDate(item.date))}</td>
-                <td>${escapeHTML(item.source)}</td>
-            </tr>
-        `).join("");
-    }
-
-    function renderInflationChart(latestByCountry) {
-        if (typeof Chart === "undefined") return;
-
-        const canvas = byId("inflation-chart");
-
-        if (!canvas) return;
-
-        const entries = [
-            ["PL", "Poland"],
-            ["US", "United States"],
-            ["EU", "European Union"]
-        ].filter(([code]) => latestByCountry[code]);
-
-        if (!entries.length) {
-            setText(
-                "inflation-chart-status",
-                "No observations"
-            );
-
-            return;
-        }
-
-        createChart("inflation", canvas, {
-            type: "bar",
-
-            data: {
-                labels: entries.map(([, name]) => name),
-
-                datasets: [{
-                    label: "Annual inflation",
-                    data: entries.map(
-                        ([code]) => latestByCountry[code].value
-                    ),
-                    backgroundColor: [
-                        "#9a5360",
-                        "#b99a65",
-                        "#71675d"
-                    ],
-                    borderWidth: 0,
-                    borderRadius: 3
-                }]
-            },
-
-            options: {
-                ...standardChartOptions("%"),
-                plugins: {
-                    ...standardChartOptions("%").plugins,
-                    legend: {
-                        display: false
-                    }
-                }
-            }
-        });
-
-        setText(
-            "inflation-chart-status",
-            `${entries.length} observations`
-        );
-    }
-
-
-    /* ========================================================
-       11. MARKETS
-       ======================================================== */
-
-    function renderMarkets() {
-        const usd = findCurrency("USD");
-        const eur = findCurrency("EUR");
-        const gold = getGoldValue();
-
-        setText(
-            "market-usd",
-            usd ? formatMoney(usd.rate) : "—"
-        );
-
-        setText(
-            "market-eur",
-            eur ? formatMoney(eur.rate) : "—"
-        );
-
-        setText(
-            "market-gold",
-            gold !== null ? formatMoney(gold) : "—"
-        );
-
-        setText(
-            "market-usd-date",
-            usd ? `Observation: ${formatDate(usd.date)}` : "No observation"
-        );
-
-        setText(
-            "market-eur-date",
-            eur ? `Observation: ${formatDate(eur.date)}` : "No observation"
-        );
-
-        setText(
-            "market-gold-date",
-            state.gold?.date
-                ? `Observation: ${formatDate(state.gold.date)}`
-                : "No observation"
-        );
-
-        setText(
-            "market-gold-large",
-            gold !== null ? formatMoney(gold) : "—"
-        );
-
-        setText(
-            "market-gold-large-date",
-            state.gold?.date
-                ? `Official observation: ${formatDate(state.gold.date)}`
-                : "Waiting for source"
-        );
-
-        renderCurrencyTable();
-        renderMarketHistory();
-    }
-
-    function renderCurrencyTable() {
-        const body = byId("market-currency-table");
-
-        if (!body) return;
-
-        if (!state.currencies.length) {
-            body.innerHTML = `
-                <tr>
-                    <td colspan="4" class="table-empty">
-                        No official currency quotations are available.
-                    </td>
-                </tr>
-            `;
-
-            setText(
-                "market-currency-status",
-                "No quotations"
-            );
-
-            return;
-        }
-
-        body.innerHTML = state.currencies.map(currency => `
-            <tr>
-                <td>${escapeHTML(currency.name)}</td>
-                <td>${escapeHTML(currency.code)}</td>
-                <td>${escapeHTML(formatNumber(currency.rate, 4))} PLN</td>
-                <td>${escapeHTML(formatDate(currency.date))}</td>
-            </tr>
-        `).join("");
-
-        setText(
-            "market-currency-status",
-            `${state.currencies.length} quotations`
-        );
-    }
-
-    async function loadMarketHistory() {
-        const engine = getDataEngine();
-
-        if (typeof engine.loadCurrencyHistory !== "function") {
-            setText(
-                "market-history-note",
-                "Historical currency data is not supported by the data engine."
-            );
-
-            return;
-        }
-
-        const currency =
-            byId("market-history-currency")?.value || "USD";
-
-        const days = Number(
-            byId("market-history-period")?.value || 30
-        );
-
-        const requestId = ++state.historyRequestId;
-
-        setText(
-            "market-history-note",
-            "Loading historical observations..."
-        );
 
         try {
-            const result = await engine.loadCurrencyHistory(
-                currency,
-                days
+            const history = await window.ArchiveData
+                .loadCurrencyHistory(currency, 30);
+
+            const observations = safeArray(
+                history?.observations
             );
 
-            if (requestId !== state.historyRequestId) return;
+            if (!observations.length) {
+                return;
+            }
 
-            const points = getHistoryPoints(result);
+            const labels = observations.map(item => {
+                return formatDate(item.effectiveDate);
+            });
 
-            renderMarketHistory(points, currency);
+            const values = observations.map(item => {
+                return safeNumber(item.mid);
+            });
+
+            createChart(
+                "currency",
+                canvas,
+                {
+                    type: "line",
+
+                    data: {
+                        labels,
+
+                        datasets: [{
+                            label: `${currency} / PLN`,
+
+                            data: values,
+
+                            borderColor: CONFIG.chartColors.blue,
+
+                            backgroundColor:
+                                "rgba(120, 149, 184, 0.10)",
+
+                            borderWidth: 2,
+
+                            fill: true,
+
+                            tension: 0.3,
+
+                            pointRadius: 1
+                        }]
+                    },
+
+                    options: CONFIG.chartDefaults
+                }
+            );
 
         } catch (error) {
             console.error(
-                "[Monetary Archive] History loading failed:",
+                "[Archive] Currency chart failed:",
                 error
             );
-
-            setText(
-                "market-history-note",
-                "Historical data could not be loaded. Please try again."
-            );
         }
     }
 
-    function renderMarketHistory(points = null, currency = null) {
-        if (typeof Chart === "undefined") return;
 
-        const canvas = byId("market-history-chart");
-
-        if (!canvas) return;
-
-        const selectedCurrency =
-            currency ||
-            byId("market-history-currency")?.value ||
-            "USD";
-
-        let data = points;
-
-        if (!data) {
-            data = getHistoryPoints(
-                state.history[selectedCurrency]
-            );
-        }
-
-        if (!data.length) {
-            setText(
-                "market-history-note",
-                "No historical observations are available for this instrument."
-            );
-
+    async function loadGoldChart() {
+        if (!window.ArchiveData) {
             return;
         }
 
-        const sorted = [...data].sort((a, b) => {
-            return String(getObservationDate(a))
-                .localeCompare(String(getObservationDate(b)));
-        });
-
-        createChart("marketHistory", canvas, {
-            type: "line",
-
-            data: {
-                labels: sorted.map(point =>
-                    formatDate(getObservationDate(point))
-                ),
-
-                datasets: [{
-                    label: `${selectedCurrency} / PLN`,
-                    data: sorted.map(getObservationValue),
-                    borderColor: "#b99a65",
-                    backgroundColor: "rgba(185,154,101,0.08)",
-                    borderWidth: 2,
-                    pointRadius: 1,
-                    pointHoverRadius: 4,
-                    tension: 0.2,
-                    fill: true
-                }]
-            },
-
-            options: standardChartOptions("PLN")
-        });
-
-        setText(
-            "market-history-note",
-            `${sorted.length} observations · ${selectedCurrency} / PLN`
+        const canvas = $(
+            "#gold-chart, " +
+            "[data-chart='gold']"
         );
+
+        if (!canvas) {
+            return;
+        }
+
+        try {
+            const history = await window.ArchiveData
+                .loadGoldHistory(30);
+
+            const observations = safeArray(history);
+
+            if (!observations.length) {
+                return;
+            }
+
+            const labels = observations.map(item => {
+                return formatDate(item.data);
+            });
+
+            const values = observations.map(item => {
+                const price = safeNumber(item.cena);
+
+                return price === null
+                    ? null
+                    : convertFromPLN(
+                        price,
+                        state.selectedCurrency
+                    );
+            });
+
+            createChart(
+                "gold",
+                canvas,
+                {
+                    type: "line",
+
+                    data: {
+                        labels,
+
+                        datasets: [{
+                            label: "Gold price per gram",
+
+                            data: values,
+
+                            borderColor: CONFIG.chartColors.gold,
+
+                            backgroundColor:
+                                "rgba(197, 164, 109, 0.10)",
+
+                            borderWidth: 2,
+
+                            fill: true,
+
+                            tension: 0.3,
+
+                            pointRadius: 1
+                        }]
+                    },
+
+                    options: CONFIG.chartDefaults
+                }
+            );
+
+        } catch (error) {
+            console.error(
+                "[Archive] Gold chart failed:",
+                error
+            );
+        }
     }
 
 
     /* ========================================================
-       12. CALCULATORS
-       ======================================================== */
+       17. CHART PERIOD SELECTORS
+    ======================================================== */
 
-    function readInput(id) {
-        const element = byId(id);
-
-        if (!element) return null;
-
-        return toNumber(element.value);
-    }
-
-    function showCalculationResult(resultId, noteId, value, note) {
-        setText(resultId, value);
-        setText(noteId, note);
-    }
-
-    function calculateCurrency() {
-        const amount = readInput("currency-amount");
-        const rate = readInput("currency-rate");
-
-        const from = byId("currency-from")?.value || "PLN";
-        const to = byId("currency-to")?.value || "USD";
-
-        if (amount === null || rate === null) {
-            showCalculationResult(
-                "currency-result",
-                "currency-result-note",
-                "—",
-                "Enter a valid amount and exchange rate."
-            );
-
-            return;
-        }
-
-        if (amount < 0 || rate <= 0) {
-            showCalculationResult(
-                "currency-result",
-                "currency-result-note",
-                "—",
-                "The amount cannot be negative and the rate must be positive."
-            );
-
-            return;
-        }
-
-        const result = amount * rate;
-
-        showCalculationResult(
-            "currency-result",
-            "currency-result-note",
-            formatNumber(result, 4),
-            `${formatNumber(amount, 2)} ${from} converted to ${to}.`
-        );
-    }
-
-    function updateCurrencyRate() {
-        const from = byId("currency-from")?.value || "PLN";
-        const to = byId("currency-to")?.value || "USD";
-
-        const rateInput = byId("currency-rate");
-        const note = byId("currency-rate-note");
-
-        if (!rateInput) return;
-
-        if (from === to) {
-            rateInput.value = "1";
-
-            if (note) {
-                note.textContent = "Same currency: conversion rate is 1.";
+    function initializeChartPeriods() {
+        $all("[data-chart-period]").forEach(button => {
+            if (button.dataset.initialized === "true") {
+                return;
             }
 
-            return;
-        }
+            button.dataset.initialized = "true";
 
-        const fromRate =
-            from === "PLN"
-                ? 1
-                : findCurrency(from)?.rate;
+            button.addEventListener("click", async () => {
+                const period = safeNumber(
+                    button.dataset.chartPeriod,
+                    30
+                );
 
-        const toRate =
-            to === "PLN"
-                ? 1
-                : findCurrency(to)?.rate;
+                state.selectedPeriod = period;
 
-        if (
-            !isValidNumber(fromRate) ||
-            !isValidNumber(toRate) ||
-            Number(fromRate) <= 0
-        ) {
-            rateInput.value = "";
+                $all("[data-chart-period]").forEach(item => {
+                    item.classList.toggle(
+                        "active",
+                        item === button
+                    );
+                });
 
-            if (note) {
-                note.textContent =
-                    "An official rate for this currency pair is unavailable. Enter a rate manually.";
-            }
+                try {
+                    await loadBitcoinHistory(period);
 
-            return;
-        }
+                } catch (error) {
+                    console.error(
+                        "[Archive] Could not update chart period:",
+                        error
+                    );
 
-        const calculatedRate =
-            Number(fromRate) / Number(toRate);
-
-        rateInput.value = calculatedRate.toFixed(8);
-
-        if (note) {
-            note.textContent =
-                `Calculated from official PLN reference rates. ${from} → ${to}.`;
-        }
-    }
-
-    function calculateInflation() {
-        const amount = readInput("inflation-amount");
-        const rate = readInput("inflation-rate");
-        const years = readInput("inflation-years");
-
-        if (
-            amount === null ||
-            rate === null ||
-            years === null ||
-            amount < 0 ||
-            years < 0 ||
-            years > 200 ||
-            rate <= -100
-        ) {
-            showCalculationResult(
-                "inflation-result",
-                "inflation-result-note",
-                "—",
-                "Check the amount, inflation rate and number of years."
-            );
-
-            return;
-        }
-
-        const result =
-            amount * Math.pow(1 + rate / 100, years);
-
-        const difference = result - amount;
-
-        showCalculationResult(
-            "inflation-result",
-            "inflation-result-note",
-            formatMoney(result),
-            `Estimated equivalent amount. Difference: ${formatMoney(difference)} over ${years} years.`
-        );
-    }
-
-    function calculateCompound() {
-        const principal = readInput("compound-principal");
-        const rate = readInput("compound-rate");
-        const years = readInput("compound-years");
-
-        const frequency = Number(
-            byId("compound-frequency")?.value || 12
-        );
-
-        if (
-            principal === null ||
-            rate === null ||
-            years === null ||
-            principal < 0 ||
-            years < 0 ||
-            years > 200 ||
-            rate <= -100 ||
-            frequency <= 0
-        ) {
-            showCalculationResult(
-                "compound-result",
-                "compound-result-note",
-                "—",
-                "Check the principal, rate, period and compounding frequency."
-            );
-
-            return;
-        }
-
-        const result =
-            principal *
-            Math.pow(
-                1 + rate / 100 / frequency,
-                frequency * years
-            );
-
-        const growth = result - principal;
-
-        showCalculationResult(
-            "compound-result",
-            "compound-result-note",
-            formatMoney(result),
-            `Projected mathematical growth: ${formatMoney(growth)}.`
-        );
-    }
-
-    function calculatePercentage() {
-        const oldValue = readInput("percentage-old");
-        const newValue = readInput("percentage-new");
-
-        if (
-            oldValue === null ||
-            newValue === null ||
-            oldValue === 0
-        ) {
-            showCalculationResult(
-                "percentage-result",
-                "percentage-result-note",
-                "—",
-                "Enter two valid values. The original value cannot be zero."
-            );
-
-            return;
-        }
-
-        const change =
-            ((newValue - oldValue) / Math.abs(oldValue)) * 100;
-
-        const direction =
-            change > 0
-                ? "Increase"
-                : change < 0
-                    ? "Decrease"
-                    : "No change";
-
-        showCalculationResult(
-            "percentage-result",
-            "percentage-result-note",
-            formatPercent(change),
-            `${direction}: ${formatNumber(oldValue)} → ${formatNumber(newValue)}.`
-        );
-    }
-
-    function switchCalculator() {
-        const type =
-            byId("calculator-type")?.value || "currency";
-
-        $$(".calculator-panel").forEach(panel => {
-            const active =
-                panel.id === `calculator-${type}`;
-
-            panel.classList.toggle("hidden", !active);
+                    showNotification(
+                        "Historical Bitcoin data is temporarily unavailable.",
+                        "warning"
+                    );
+                }
+            });
         });
     }
 
 
     /* ========================================================
-       13. HISTORICAL ARCHIVE
-       ======================================================== */
+       18. NAVIGATION
+    ======================================================== */
 
-    function getFilteredArchive() {
-        const search = (
-            byId("archive-search")?.value || ""
-        ).trim().toLowerCase();
+    function initializeNavigation() {
+        const links = $all(
+            ".nav-link, " +
+            "[data-section-link]"
+        );
 
-        const country =
-            byId("archive-country")?.value || "all";
-
-        const category =
-            byId("archive-category")?.value || "all";
-
-        return state.observations.filter(item => {
-            const searchable = [
-                item.name,
-                item.countryName,
-                item.country,
-                item.source,
-                item.category,
-                item.date
-            ].join(" ").toLowerCase();
-
-            if (search && !searchable.includes(search)) {
-                return false;
+        links.forEach(link => {
+            if (link.dataset.initialized === "true") {
+                return;
             }
 
-            if (
-                country !== "all" &&
-                item.country !== country
-            ) {
-                return false;
-            }
+            link.dataset.initialized = "true";
 
-            if (
-                category !== "all" &&
-                item.category !== category
-            ) {
-                return false;
-            }
+            link.addEventListener("click", event => {
+                const href = link.getAttribute("href");
 
-            return true;
+                const sectionId =
+                    link.dataset.sectionLink ||
+                    (href && href.startsWith("#")
+                        ? href.slice(1)
+                        : null);
+
+                if (!sectionId) {
+                    return;
+                }
+
+                const section = document.getElementById(
+                    sectionId
+                );
+
+                if (!section) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                navigateToSection(sectionId);
+            });
         });
     }
 
-    function renderArchive() {
-        const records = getFilteredArchive();
 
-        const container = byId("archive-list");
-
-        if (!container) return;
-
-        setText(
-            "archive-record-count",
-            `${records.length} records`
+    function navigateToSection(sectionId) {
+        const section = document.getElementById(
+            sectionId
         );
 
-        setText(
-            "archive-status",
-            records.length
-                ? `${records.length} records`
-                : "No records"
-        );
-
-        if (!records.length) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-title">
-                        No historical records found
-                    </div>
-
-                    <div class="empty-state-description">
-                        Try changing the search term or filters.
-                    </div>
-                </div>
-            `;
-
+        if (!section) {
             return;
         }
 
-        container.innerHTML = records
-            .slice(0, CONFIG.maximumTableRows)
-            .map(item => `
-                <article class="archive-entry">
-                    <div class="archive-entry-main">
-                        <div class="panel-kicker">
-                            ${escapeHTML(item.category)}
-                        </div>
+        state.activeSection = sectionId;
 
-                        <div class="archive-entry-title">
-                            ${escapeHTML(item.name)}
-                        </div>
+        section.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
 
-                        <div class="archive-entry-meta">
-                            ${escapeHTML(item.countryName)}
-                            ·
-                            ${escapeHTML(formatDate(item.date))}
-                            ·
-                            ${escapeHTML(item.source)}
-                        </div>
-                    </div>
+        $all(".nav-link, [data-section-link]").forEach(link => {
+            const target =
+                link.dataset.sectionLink ||
+                link.getAttribute("href")?.replace("#", "");
 
-                    <div class="archive-entry-value">
-                        ${escapeHTML(formatNumber(item.value, 3))}
-                        <span>${escapeHTML(item.unit)}</span>
-                    </div>
-                </article>
-            `).join("");
+            link.classList.toggle(
+                "active",
+                target === sectionId
+            );
+        });
+
+        dispatchEvent("archive:section-changed", {
+            section: sectionId
+        });
     }
 
 
     /* ========================================================
-       14. CSV EXPORT
-       ======================================================== */
+       19. MOBILE NAVIGATION
+    ======================================================== */
 
-    function csvEscape(value) {
-        const text = String(value ?? "");
+    function initializeMobileNavigation() {
+        const toggle = $(
+            "#mobile-menu-toggle, " +
+            "[data-mobile-menu-toggle]"
+        );
 
-        return `"${text.replace(/"/g, '""')}"`;
+        const sidebar = $(
+            "#sidebar, " +
+            ".sidebar"
+        );
+
+        if (!toggle || !sidebar) {
+            return;
+        }
+
+        toggle.addEventListener("click", () => {
+            sidebar.classList.toggle("mobile-open");
+
+            toggle.classList.toggle("active");
+        });
+
+        $all(".nav-link", sidebar).forEach(link => {
+            link.addEventListener("click", () => {
+                sidebar.classList.remove("mobile-open");
+
+                toggle.classList.remove("active");
+            });
+        });
     }
+
+
+    /* ========================================================
+       20. TABLE SEARCH AND FILTERS
+    ======================================================== */
+
+    function initializeTableSearch() {
+        $all("[data-table-search]").forEach(input => {
+            if (input.dataset.initialized === "true") {
+                return;
+            }
+
+            input.dataset.initialized = "true";
+
+            const targetSelector =
+                input.dataset.tableSearch;
+
+            const target = $(targetSelector);
+
+            if (!target) {
+                return;
+            }
+
+            input.addEventListener("input", () => {
+                const query = input.value
+                    .trim()
+                    .toLowerCase();
+
+                $all("tr", target).forEach(row => {
+                    const matches = row.textContent
+                        .toLowerCase()
+                        .includes(query);
+
+                    row.style.display = matches
+                        ? ""
+                        : "none";
+                });
+            });
+        });
+    }
+
+
+    /* ========================================================
+       21. FINANCIAL CALCULATORS
+    ======================================================== */
+
+    function calculateCompoundInterest({
+        principal,
+        annualRate,
+        years,
+        contributions = 0
+    }) {
+        const P = safeNumber(principal, 0);
+
+        const rate = safeNumber(annualRate, 0) / 100;
+
+        const duration = safeNumber(years, 0);
+
+        const monthlyContribution =
+            safeNumber(contributions, 0);
+
+        if (
+            P < 0 ||
+            duration < 0 ||
+            monthlyContribution < 0
+        ) {
+            return null;
+        }
+
+        const months = Math.round(duration * 12);
+
+        const monthlyRate = rate / 12;
+
+        let balance = P;
+
+        for (let month = 0; month < months; month++) {
+            balance *= 1 + monthlyRate;
+
+            balance += monthlyContribution;
+        }
+
+        const totalContributions =
+            P + monthlyContribution * months;
+
+        return {
+            finalValue: balance,
+
+            totalContributions,
+
+            interest: balance - totalContributions
+        };
+    }
+
+
+    function calculateSimpleInterest({
+        principal,
+        annualRate,
+        years
+    }) {
+        const P = safeNumber(principal, 0);
+
+        const rate = safeNumber(annualRate, 0) / 100;
+
+        const duration = safeNumber(years, 0);
+
+        if (
+            P < 0 ||
+            duration < 0
+        ) {
+            return null;
+        }
+
+        const interest = P * rate * duration;
+
+        return {
+            finalValue: P + interest,
+
+            principal: P,
+
+            interest
+        };
+    }
+
+
+    function calculateInflationValue({
+        amount,
+        inflationRate,
+        years
+    }) {
+        const value = safeNumber(amount, 0);
+
+        const rate = safeNumber(inflationRate, 0) / 100;
+
+        const duration = safeNumber(years, 0);
+
+        if (
+            value < 0 ||
+            duration < 0 ||
+            rate <= -1
+        ) {
+            return null;
+        }
+
+        const futureCost =
+            value * Math.pow(1 + rate, duration);
+
+        return {
+            originalValue: value,
+
+            futureCost,
+
+            difference: futureCost - value
+        };
+    }
+
+
+    function initializeCalculators() {
+        const compoundForm = $(
+            "#compound-interest-form"
+        );
+
+        if (compoundForm) {
+            compoundForm.addEventListener(
+                "submit",
+                event => {
+                    event.preventDefault();
+
+                    const result = calculateCompoundInterest({
+                        principal: $(
+                            "#compound-principal"
+                        )?.value,
+
+                        annualRate: $(
+                            "#compound-rate"
+                        )?.value,
+
+                        years: $(
+                            "#compound-years"
+                        )?.value,
+
+                        contributions: $(
+                            "#compound-contribution"
+                        )?.value || 0
+                    });
+
+                    if (!result) {
+                        showNotification(
+                            "Please enter valid calculator values.",
+                            "warning"
+                        );
+
+                        return;
+                    }
+
+                    setText(
+                        "#compound-result",
+                        formatCurrency(
+                            result.finalValue
+                        )
+                    );
+
+                    setText(
+                        "#compound-invested",
+                        formatCurrency(
+                            result.totalContributions
+                        )
+                    );
+
+                    setText(
+                        "#compound-interest",
+                        formatCurrency(
+                            result.interest
+                        )
+                    );
+                }
+            );
+        }
+
+
+        const simpleForm = $(
+            "#simple-interest-form"
+        );
+
+        if (simpleForm) {
+            simpleForm.addEventListener(
+                "submit",
+                event => {
+                    event.preventDefault();
+
+                    const result = calculateSimpleInterest({
+                        principal: $(
+                            "#simple-principal"
+                        )?.value,
+
+                        annualRate: $(
+                            "#simple-rate"
+                        )?.value,
+
+                        years: $(
+                            "#simple-years"
+                        )?.value
+                    });
+
+                    if (!result) {
+                        showNotification(
+                            "Please enter valid calculator values.",
+                            "warning"
+                        );
+
+                        return;
+                    }
+
+                    setText(
+                        "#simple-result",
+                        formatCurrency(result.finalValue)
+                    );
+
+                    setText(
+                        "#simple-interest-value",
+                        formatCurrency(result.interest)
+                    );
+                }
+            );
+        }
+
+
+        const inflationForm = $(
+            "#inflation-calculator-form"
+        );
+
+        if (inflationForm) {
+            inflationForm.addEventListener(
+                "submit",
+                event => {
+                    event.preventDefault();
+
+                    const result = calculateInflationValue({
+                        amount: $(
+                            "#inflation-amount"
+                        )?.value,
+
+                        inflationRate: $(
+                            "#inflation-rate"
+                        )?.value,
+
+                        years: $(
+                            "#inflation-years"
+                        )?.value
+                    });
+
+                    if (!result) {
+                        showNotification(
+                            "Please enter valid calculator values.",
+                            "warning"
+                        );
+
+                        return;
+                    }
+
+                    setText(
+                        "#inflation-result",
+                        formatCurrency(result.futureCost)
+                    );
+
+                    setText(
+                        "#inflation-difference",
+                        formatCurrency(result.difference)
+                    );
+                }
+            );
+        }
+
+
+        const currencyForm = $(
+            "#currency-calculator-form"
+        );
+
+        if (currencyForm) {
+            currencyForm.addEventListener(
+                "submit",
+                event => {
+                    event.preventDefault();
+
+                    const amount = safeNumber(
+                        $("#conversion-amount")?.value
+                    );
+
+                    const from = $(
+                        "#conversion-from"
+                    )?.value;
+
+                    const to = $(
+                        "#conversion-to"
+                    )?.value;
+
+                    const result = convertCurrency(
+                        amount,
+                        from,
+                        to
+                    );
+
+                    setText(
+                        "#conversion-result",
+                        result === null
+                            ? "Rate unavailable"
+                            : formatCurrency(result, to)
+                    );
+                }
+            );
+        }
+    }
+
+
+    function updateCalculatorCurrency() {
+        $all("[data-calculator-currency]").forEach(element => {
+            element.textContent = state.selectedCurrency;
+        });
+    }
+
+
+    /* ========================================================
+       22. CSV EXPORT
+    ======================================================== */
 
     function downloadCSV(filename, rows) {
-        if (!rows.length) {
-            alert("There are no records available to export.");
+        if (!Array.isArray(rows) || !rows.length) {
+            showNotification(
+                "There is no data available to export.",
+                "warning"
+            );
+
             return;
         }
 
-        const csv = rows
-            .map(row => row.map(csvEscape).join(","))
-            .join("\r\n");
+        const csv = rows.map(row => {
+            return row.map(value => {
+                const safeValue = String(value ?? "")
+                    .replace(/"/g, '""');
+
+                return `"${safeValue}"`;
+            }).join(",");
+        }).join("\r\n");
 
         const blob = new Blob(
             ["\uFEFF" + csv],
-            { type: "text/csv;charset=utf-8;" }
+            {
+                type: "text/csv;charset=utf-8;"
+            }
         );
 
         const url = URL.createObjectURL(blob);
@@ -2012,322 +2122,556 @@
         const link = document.createElement("a");
 
         link.href = url;
+
         link.download = filename;
 
         document.body.appendChild(link);
+
         link.click();
+
         link.remove();
 
         URL.revokeObjectURL(url);
     }
 
-    function exportObservations(filename, records) {
+
+    function exportCurrencies() {
         const rows = [
             [
-                "Indicator",
-                "Country",
-                "Value",
-                "Unit",
-                "Observation date",
-                "Source",
-                "Category"
+                "Currency",
+                "Currency name",
+                "Value in PLN",
+                `Value in ${state.selectedCurrency}`,
+                "Date"
             ]
         ];
 
-        records.forEach(item => {
+        getCurrencyRates().forEach(rate => {
+            const converted = convertCurrency(
+                rate.value,
+                "PLN",
+                state.selectedCurrency
+            );
+
             rows.push([
-                item.name,
-                item.countryName,
-                item.value,
-                item.unit,
-                item.date,
-                item.source,
-                item.category
+                rate.code,
+                CONFIG.currencyNames[rate.code] || rate.code,
+                rate.value,
+                converted ?? "",
+                rate.date || ""
             ]);
         });
 
-        downloadCSV(filename, rows);
-    }
-
-    function exportStatistics() {
-        exportObservations(
-            "monetary-archive-statistics.csv",
-            getFilteredStatistics()
-        );
-    }
-
-    function exportInflation() {
-        exportObservations(
-            "monetary-archive-inflation.csv",
-            getInflationRecords()
-        );
-    }
-
-    function exportArchive() {
-        exportObservations(
-            "monetary-archive-historical-records.csv",
-            getFilteredArchive()
+        downloadCSV(
+            "monetary-archive-currencies.csv",
+            rows
         );
     }
 
 
-    /* ========================================================
-       15. EVENT LISTENERS
-       ======================================================== */
+    function exportEconomicData() {
+        const rows = [
+            [
+                "Country",
+                "Indicator",
+                "Category",
+                "Value",
+                "Unit",
+                "Date",
+                "Source"
+            ]
+        ];
 
-    function bindNavigation() {
-        $$(".nav-link[data-page]").forEach(button => {
-            button.addEventListener("click", () => {
-                navigateTo(button.dataset.page);
-            });
+        safeArray(
+            state.dashboard?.observations
+        ).forEach(item => {
+            rows.push([
+                item.countryName || item.country,
+                item.name || item.indicator,
+                item.category,
+                item.value,
+                item.unit,
+                item.date,
+                item.source
+            ]);
         });
 
-        $$("[data-navigate]").forEach(button => {
-            button.addEventListener("click", () => {
-                navigateTo(button.dataset.navigate);
-            });
+        downloadCSV(
+            "monetary-archive-economic-data.csv",
+            rows
+        );
+    }
+
+
+    function initializeExports() {
+        $all("[data-export-currencies]").forEach(button => {
+            button.addEventListener(
+                "click",
+                exportCurrencies
+            );
         });
 
-        byId("mobile-menu-button")
-            ?.addEventListener("click", openMobileSidebar);
-
-        byId("sidebar-overlay")
-            ?.addEventListener("click", closeMobileSidebar);
-
-        document.addEventListener("keydown", event => {
-            if (event.key === "Escape") {
-                closeMobileSidebar();
-            }
+        $all("[data-export-economy]").forEach(button => {
+            button.addEventListener(
+                "click",
+                exportEconomicData
+            );
         });
-    }
-
-    function bindRefreshButtons() {
-        const refresh = () => loadDashboard({
-            force: true
-        });
-
-        byId("refresh-button")
-            ?.addEventListener("click", refresh);
-
-        byId("overview-refresh-button")
-            ?.addEventListener("click", refresh);
-
-        byId("markets-refresh-button")
-            ?.addEventListener("click", refresh);
-    }
-
-    function bindStatistics() {
-        [
-            "statistics-search",
-            "statistics-country",
-            "statistics-category",
-            "statistics-source"
-        ].forEach(id => {
-            byId(id)?.addEventListener("input", renderStatistics);
-            byId(id)?.addEventListener("change", renderStatistics);
-        });
-
-        byId("statistics-export-button")
-            ?.addEventListener("click", exportStatistics);
-    }
-
-    function bindInflation() {
-        byId("inflation-export-button")
-            ?.addEventListener("click", exportInflation);
-    }
-
-    function bindMarkets() {
-        byId("market-history-load")
-            ?.addEventListener("click", loadMarketHistory);
-
-        byId("market-history-currency")
-            ?.addEventListener("change", loadMarketHistory);
-
-        byId("market-history-period")
-            ?.addEventListener("change", loadMarketHistory);
-    }
-
-    function bindArchive() {
-        byId("archive-search")
-            ?.addEventListener("input", renderArchive);
-
-        byId("archive-country")
-            ?.addEventListener("change", renderArchive);
-
-        byId("archive-category")
-            ?.addEventListener("change", renderArchive);
-
-        byId("archive-export-button")
-            ?.addEventListener("click", exportArchive);
-    }
-
-    function bindCalculators() {
-        byId("calculator-type")
-            ?.addEventListener("change", switchCalculator);
-
-        byId("currency-calculate")
-            ?.addEventListener("click", calculateCurrency);
-
-        byId("inflation-calculate")
-            ?.addEventListener("click", calculateInflation);
-
-        byId("compound-calculate")
-            ?.addEventListener("click", calculateCompound);
-
-        byId("percentage-calculate")
-            ?.addEventListener("click", calculatePercentage);
-
-        byId("currency-from")
-            ?.addEventListener("change", updateCurrencyRate);
-
-        byId("currency-to")
-            ?.addEventListener("change", updateCurrencyRate);
-
-        byId("currency-amount")
-            ?.addEventListener("input", calculateCurrency);
-
-        byId("currency-rate")
-            ?.addEventListener("input", calculateCurrency);
-
-        byId("inflation-amount")
-            ?.addEventListener("input", calculateInflation);
-
-        byId("inflation-rate")
-            ?.addEventListener("input", calculateInflation);
-
-        byId("inflation-years")
-            ?.addEventListener("input", calculateInflation);
-
-        byId("compound-principal")
-            ?.addEventListener("input", calculateCompound);
-
-        byId("compound-rate")
-            ?.addEventListener("input", calculateCompound);
-
-        byId("compound-years")
-            ?.addEventListener("input", calculateCompound);
-
-        byId("compound-frequency")
-            ?.addEventListener("change", calculateCompound);
-
-        byId("percentage-old")
-            ?.addEventListener("input", calculatePercentage);
-
-        byId("percentage-new")
-            ?.addEventListener("input", calculatePercentage);
     }
 
 
     /* ========================================================
-       16. APPLICATION RENDERING
-       ======================================================== */
+       23. MANUAL REFRESH
+    ======================================================== */
 
-    function renderEverything() {
-        renderOverview();
-        renderStatistics();
-        renderInflation();
-        renderMarkets();
-        renderArchive();
-
-        updateCurrencyRate();
-
-        calculateCurrency();
-        calculateInflation();
-        calculateCompound();
-        calculatePercentage();
-    }
-
-
-    /* ========================================================
-       17. AUTOMATIC REFRESH
-       ======================================================== */
-
-    function startAutomaticRefresh() {
-        if (state.refreshTimer) {
-            clearInterval(state.refreshTimer);
+    async function refreshAllData() {
+        if (state.isRefreshing) {
+            return;
         }
 
-        state.refreshTimer = setInterval(() => {
-            if (document.visibilityState === "visible") {
-                loadDashboard();
+        state.isRefreshing = true;
+
+        updateConnectionStatus(
+            "loading",
+            "Updating data..."
+        );
+
+        try {
+            if (window.ArchiveData?.clearCache) {
+                window.ArchiveData.clearCache();
             }
+
+            await Promise.allSettled([
+                loadMainData(true),
+                loadBitcoin(),
+                loadBitcoinHistory(state.selectedPeriod)
+            ]);
+
+            renderDashboard();
+
+            updateConnectionStatus(
+                "online",
+                "Data updated"
+            );
+
+            showNotification(
+                "The financial dashboard has been refreshed.",
+                "success"
+            );
+
+        } catch (error) {
+            console.error(
+                "[Archive] Refresh failed:",
+                error
+            );
+
+            updateConnectionStatus(
+                "error",
+                "Some data sources are unavailable"
+            );
+
+            showNotification(
+                "Some data could not be refreshed.",
+                "warning"
+            );
+
+        } finally {
+            state.isRefreshing = false;
+        }
+    }
+
+
+    function initializeRefreshButton() {
+        const buttons = $all(
+            "#refresh-button, " +
+            "[data-refresh-dashboard]"
+        );
+
+        buttons.forEach(button => {
+            button.addEventListener(
+                "click",
+                refreshAllData
+            );
+        });
+    }
+
+
+    /* ========================================================
+       24. AUTOMATIC UPDATES
+    ======================================================== */
+
+    function startAutomaticUpdates() {
+        window.setInterval(async () => {
+            try {
+                await loadMainData(true);
+
+                renderDashboard();
+
+            } catch (error) {
+                console.warn(
+                    "[Archive] Automatic dashboard update failed:",
+                    error
+                );
+            }
+
         }, CONFIG.refreshInterval);
-    }
 
-    document.addEventListener(
-        "visibilitychange",
-        () => {
-            if (document.visibilityState === "visible") {
-                updateClock();
+
+        window.setInterval(async () => {
+            try {
+                await loadBitcoin();
+
+            } catch (error) {
+                console.warn(
+                    "[Archive] Automatic Bitcoin update failed:",
+                    error
+                );
             }
-        }
-    );
 
-
-    /* ========================================================
-       18. INITIALIZATION
-       ======================================================== */
-
-    function initializeApplication() {
-        console.info(
-            "%cTHE MONETARY ARCHIVE",
-            "color:#b99a65;font-size:16px;font-weight:bold;"
-        );
-
-        console.info(
-            "Financial Intelligence · Application initialized"
-        );
-
-        bindNavigation();
-        bindRefreshButtons();
-        bindStatistics();
-        bindInflation();
-        bindMarkets();
-        bindArchive();
-        bindCalculators();
-
-        updateClock();
-        setInterval(updateClock, CONFIG.clockInterval);
-
-        switchCalculator();
-
-        startAutomaticRefresh();
-
-        loadDashboard();
-
-        window.dispatchEvent(
-            new CustomEvent("archive:application-ready")
-        );
+        }, CONFIG.bitcoinRefreshInterval);
     }
 
 
     /* ========================================================
-       19. PUBLIC APPLICATION INTERFACE
-       ======================================================== */
+       25. COUNTRY SELECTION FROM GLOBE
+    ======================================================== */
+
+    function initializeGlobeEvents() {
+        window.addEventListener(
+            "archive:country-selected",
+            event => {
+                const country = event.detail;
+
+                if (!country) {
+                    return;
+                }
+
+                state.selectedCountry =
+                    country.id || state.selectedCountry;
+
+                setText(
+                    "#selected-country-name",
+                    country.name || "Unknown country"
+                );
+
+                setText(
+                    "#country-name",
+                    country.name || "Unknown country"
+                );
+
+                renderSelectedCountry(country);
+            }
+        );
+    }
+
+
+    function renderSelectedCountry(country) {
+        const panel = $(
+            "#country-panel, " +
+            "[data-country-panel]"
+        );
+
+        if (panel) {
+            panel.classList.add("active");
+        }
+
+        /*
+         * The current data engine provides World Bank
+         * observations for Poland and the United States.
+         *
+         * Other countries are not assigned invented
+         * economic figures.
+         */
+
+        const countryCode = country.id;
+
+        const inflation = getLatestObservation(
+            countryCode,
+            "inflation"
+        );
+
+        const gdp = getLatestObservation(
+            countryCode,
+            "economy"
+        );
+
+        setText(
+            "#country-inflation",
+            inflation
+                ? formatPercent(inflation.value)
+                : "Not available"
+        );
+
+        setText(
+            "#country-gdp",
+            gdp
+                ? formatPercent(gdp.value)
+                : "Not available"
+        );
+
+        setText(
+            "#country-data-date",
+            formatDate(
+                inflation?.date || gdp?.date
+            )
+        );
+
+        dispatchEvent("archive:country-data-rendered", {
+            country,
+            inflation,
+            gdp
+        });
+    }
+
+
+    /* ========================================================
+       26. TOOLTIP INITIALIZATION
+    ======================================================== */
+
+    function initializeTooltips() {
+        $all("[data-tooltip]").forEach(element => {
+            element.setAttribute(
+                "title",
+                element.dataset.tooltip
+            );
+        });
+    }
+
+
+    /* ========================================================
+       27. ACCESSIBILITY
+    ======================================================== */
+
+    function initializeAccessibility() {
+        $all("button").forEach(button => {
+            if (!button.getAttribute("aria-label") &&
+                !button.textContent.trim()) {
+
+                button.setAttribute(
+                    "aria-label",
+                    "Website control"
+                );
+            }
+        });
+    }
+
+
+    /* ========================================================
+       28. INITIAL CHART LOADING
+    ======================================================== */
+
+    async function initializeCharts() {
+        const tasks = [];
+
+        if (
+            $("#currency-chart") ||
+            $("[data-chart='currency']")
+        ) {
+            tasks.push(
+                loadCurrencyChart("USD")
+            );
+        }
+
+        if (
+            $("#gold-chart") ||
+            $("[data-chart='gold']")
+        ) {
+            tasks.push(
+                loadGoldChart()
+            );
+        }
+
+        if (
+            $("#bitcoin-chart") ||
+            $("#btc-chart") ||
+            $("[data-chart='bitcoin']")
+        ) {
+            tasks.push(
+                loadBitcoinHistory(
+                    state.selectedPeriod
+                )
+            );
+        }
+
+        await Promise.allSettled(tasks);
+    }
+
+
+    /* ========================================================
+       29. APPLICATION INITIALIZATION
+    ======================================================== */
+
+    async function initializeApplication() {
+        console.info(
+            "[Monetary Archive] Initializing application..."
+        );
+
+        setLoading(true);
+
+        restoreCurrencyPreference();
+
+        initializeCurrencySelector();
+
+        initializeNavigation();
+
+        initializeMobileNavigation();
+
+        initializeTableSearch();
+
+        initializeCalculators();
+
+        initializeExports();
+
+        initializeRefreshButton();
+
+        initializeChartPeriods();
+
+        initializeGlobeEvents();
+
+        initializeTooltips();
+
+        initializeAccessibility();
+
+        try {
+            const results = await Promise.allSettled([
+                loadMainData(false),
+                loadBitcoin()
+            ]);
+
+            const dashboardResult = results[0];
+
+            const bitcoinResult = results[1];
+
+            if (dashboardResult.status === "fulfilled") {
+                renderDashboard();
+
+                updateConnectionStatus(
+                    "online",
+                    "Data connected"
+                );
+
+            } else {
+                console.error(
+                    "[Archive] Main data failed:",
+                    dashboardResult.reason
+                );
+
+                updateConnectionStatus(
+                    "error",
+                    "Economic data unavailable"
+                );
+
+                showNotification(
+                    "The economic data service could not be reached.",
+                    "warning"
+                );
+            }
+
+            if (bitcoinResult.status === "rejected") {
+                console.error(
+                    "[Archive] Bitcoin data failed:",
+                    bitcoinResult.reason
+                );
+
+                setText(
+                    "#bitcoin-price",
+                    "Temporarily unavailable"
+                );
+            }
+
+            await initializeCharts();
+
+            updateCalculatorCurrency();
+
+            updateLastUpdated(
+                state.lastDashboardUpdate
+            );
+
+        } catch (error) {
+            console.error(
+                "[Monetary Archive] Initialization error:",
+                error
+            );
+
+            updateConnectionStatus(
+                "error",
+                "Initialization failed"
+            );
+
+        } finally {
+            setLoading(false);
+
+            document.body.classList.add(
+                "archive-initialized"
+            );
+
+            dispatchEvent("archive:application-ready", {
+                version: "1.0.0"
+            });
+
+            console.info(
+                "[Monetary Archive] Application initialized."
+            );
+        }
+
+        startAutomaticUpdates();
+    }
+
+
+    /* ========================================================
+       30. PUBLIC APPLICATION API
+    ======================================================== */
 
     window.MonetaryArchive = Object.freeze({
-        refresh: () => loadDashboard({ force: true }),
 
-        navigate: navigateTo,
+        version: "1.0.0",
 
-        getState: () => ({
-            currentPage: state.currentPage,
-            loading: state.loading,
-            lastSuccessfulLoad: state.lastSuccessfulLoad,
-            currencies: state.currencies.length,
-            observations: state.observations.length,
-            errors: [...state.errors]
-        }),
+        getState() {
+            return {
+                selectedCurrency: state.selectedCurrency,
 
-        exportStatistics,
-        exportInflation,
-        exportArchive
+                selectedCountry: state.selectedCountry,
+
+                dashboard: state.dashboard,
+
+                bitcoin: state.bitcoin,
+
+                bitcoinHistory: state.bitcoinHistory,
+
+                lastDashboardUpdate:
+                    state.lastDashboardUpdate
+            };
+        },
+
+        refresh: refreshAllData,
+
+        changeCurrency,
+
+        navigateToSection,
+
+        convertCurrency,
+
+        formatCurrency,
+
+        formatNumber,
+
+        formatPercent,
+
+        exportCurrencies,
+
+        exportEconomicData,
+
+        calculateCompoundInterest,
+
+        calculateSimpleInterest,
+
+        calculateInflationValue
     });
 
 
     /* ========================================================
-       20. START
-       ======================================================== */
+       31. START APPLICATION
+    ======================================================== */
 
     if (document.readyState === "loading") {
         document.addEventListener(
@@ -2335,6 +2679,7 @@
             initializeApplication,
             { once: true }
         );
+
     } else {
         initializeApplication();
     }
