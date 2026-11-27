@@ -1,20 +1,22 @@
+"use strict";
 
-(function () {
-    "use strict";
+window.ArchiveData = (() => {
 
-    const CACHE_TIME = 5 * 60 * 1000;
+    const CACHE_DURATION = 5 * 60 * 1000;
+
     const cache = new Map();
 
     const state = {
-        currencies: [],
-        ratesPLN: { PLN: 1 },
-        rateDate: null,
-        gold: null,
+        currency: "USD",
+        rates: {},
         bitcoin: null,
-        lastUpdated: null
+        gold: null,
+        economy: {},
+        lastUpdate: null,
+        errors: []
     };
 
-    const currencyNames = {
+    const CURRENCY_NAMES = {
         USD: "US Dollar",
         EUR: "Euro",
         GBP: "British Pound",
@@ -33,12 +35,37 @@
         HUF: "Hungarian Forint"
     };
 
-    function readCache(key) {
+    const COUNTRIES = {
+        USA: { name: "United States", iso2: "US" },
+        POL: { name: "Poland", iso2: "PL" },
+        DEU: { name: "Germany", iso2: "DE" },
+        FRA: { name: "France", iso2: "FR" },
+        GBR: { name: "United Kingdom", iso2: "GB" },
+        JPN: { name: "Japan", iso2: "JP" },
+        CHN: { name: "China", iso2: "CN" },
+        IND: { name: "India", iso2: "IN" },
+        BRA: { name: "Brazil", iso2: "BR" },
+        CAN: { name: "Canada", iso2: "CA" },
+        AUS: { name: "Australia", iso2: "AU" },
+        CHE: { name: "Switzerland", iso2: "CH" },
+        ITA: { name: "Italy", iso2: "IT" },
+        ESP: { name: "Spain", iso2: "ES" },
+        NLD: { name: "Netherlands", iso2: "NL" },
+        SWE: { name: "Sweden", iso2: "SE" },
+        NOR: { name: "Norway", iso2: "NO" },
+        KOR: { name: "South Korea", iso2: "KR" },
+        MEX: { name: "Mexico", iso2: "MX" },
+        ZAF: { name: "South Africa", iso2: "ZA" }
+    };
+
+    function cacheGet(key) {
         const item = cache.get(key);
 
-        if (!item) return null;
+        if (!item) {
+            return null;
+        }
 
-        if (Date.now() - item.time > CACHE_TIME) {
+        if (Date.now() - item.time > CACHE_DURATION) {
             cache.delete(key);
             return null;
         }
@@ -46,336 +73,478 @@
         return item.value;
     }
 
-    function writeCache(key, value) {
+    function cacheSet(key, value) {
         cache.set(key, {
-            time: Date.now(),
-            value
+            value,
+            time: Date.now()
         });
     }
 
-    async function request(url, cacheKey) {
-        if (cacheKey) {
-            const cached = readCache(cacheKey);
-            if (cached) return cached;
+    async function request(url, options = {}) {
+        const cached = cacheGet(url);
+
+        if (cached !== null) {
+            return cached;
         }
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
+
+        const timeout = setTimeout(() => {
+            controller.abort();
+        }, 15000);
 
         try {
             const response = await fetch(url, {
+                ...options,
                 signal: controller.signal,
-                headers: { "Accept": "application/json" }
+                headers: {
+                    Accept: "application/json",
+                    ...(options.headers || {})
+                }
             });
 
             if (!response.ok) {
-                throw new Error("Request failed: " + response.status);
+                throw new Error(
+                    `HTTP ${response.status}: ${response.statusText}`
+                );
             }
 
             const result = await response.json();
 
-            if (cacheKey) writeCache(cacheKey, result);
+            cacheSet(url, result);
 
             return result;
+
         } finally {
             clearTimeout(timeout);
         }
     }
 
-    function round(value, digits = 4) {
-        const number = Number(value);
-        if (!Number.isFinite(number)) return null;
+    async function safeRequest(name, url) {
+        try {
+            const result = await request(url);
 
-        return Number(number.toFixed(digits));
+            return {
+                success: true,
+                data: result,
+                source: name,
+                error: null
+            };
+
+        } catch (error) {
+            state.errors.push({
+                source: name,
+                message: error.message,
+                time: new Date().toISOString()
+            });
+
+            return {
+                success: false,
+                data: null,
+                source: name,
+                error: error.message
+            };
+        }
     }
 
-    function formatNumber(value, digits = 2) {
-        const number = Number(value);
-
-        if (!Number.isFinite(number)) return "Unavailable";
-
-        return new Intl.NumberFormat("en-US", {
-            maximumFractionDigits: digits
-        }).format(number);
+    function getCurrency() {
+        return state.currency;
     }
 
-    function formatMoney(value, currency, digits = 2) {
-        const number = Number(value);
+    function setCurrency(currency) {
+        if (!CURRENCY_NAMES[currency] && currency !== "PLN") {
+            throw new Error("Unsupported currency");
+        }
 
-        if (!Number.isFinite(number)) return "Unavailable";
+        state.currency = currency;
+    }
+
+    function formatMoney(value, currency = state.currency) {
+        if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+            return "Unavailable";
+        }
 
         try {
             return new Intl.NumberFormat("en-US", {
                 style: "currency",
-                currency: currency || "USD",
-                maximumFractionDigits: digits
-            }).format(number);
+                currency,
+                maximumFractionDigits: 2
+            }).format(Number(value));
+
         } catch {
-            return formatNumber(number, digits) + " " + (currency || "");
+            return `${Number(value).toFixed(2)} ${currency}`;
         }
     }
 
-    function formatDate(value) {
-        if (!value) return "Unavailable";
+    function formatNumber(value, decimals = 2) {
+        if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+            return "Unavailable";
+        }
 
-        const date = new Date(value);
-
-        if (Number.isNaN(date.getTime())) return String(value);
-
-        return new Intl.DateTimeFormat("en-GB", {
-            year: "numeric",
-            month: "short",
-            day: "2-digit"
-        }).format(date);
+        return new Intl.NumberFormat("en-US", {
+            maximumFractionDigits: decimals
+        }).format(Number(value));
     }
 
-    async function loadCurrencies(force = false) {
-        if (force) cache.delete("nbp-table");
+    function formatPercent(value) {
+        if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+            return "Unavailable";
+        }
 
-        const data = await request(
-            "https://api.nbp.pl/api/exchangerates/tables/A/?format=json",
-            "nbp-table"
+        const number = Number(value);
+
+        return `${number > 0 ? "+" : ""}${number.toFixed(2)}%`;
+    }
+
+    function getChangeClass(value) {
+        if (!Number.isFinite(Number(value))) {
+            return "neutral";
+        }
+
+        return Number(value) >= 0 ? "positive" : "negative";
+    }
+
+    async function loadCurrencyRates() {
+        const result = await safeRequest(
+            "NBP",
+            "https://api.nbp.pl/api/exchangerates/tables/A/?format=json"
         );
 
-        if (!Array.isArray(data) || !data[0] || !Array.isArray(data[0].rates)) {
-            throw new Error("Unexpected NBP currency response.");
+        if (!result.success || !result.data?.[0]?.rates) {
+            return false;
         }
 
-        const table = data[0];
-        const rates = { PLN: 1 };
+        const rates = {
+            PLN: 1
+        };
 
-        table.rates.forEach(item => {
-            if (item.code && Number(item.mid) > 0) {
-                rates[item.code] = Number(item.mid);
-            }
+        result.data[0].rates.forEach(item => {
+            rates[item.code] = Number(item.mid);
         });
 
-        state.ratesPLN = rates;
-        state.rateDate = table.effectiveDate;
-        state.currencies = Object.keys(rates).map(code => ({
-            code,
-            name: currencyNames[code] || code,
-            ratePLN: rates[code]
-        }));
+        state.rates = rates;
 
-        return state.currencies;
+        return true;
     }
 
-    function convert(amount, from, to) {
-        const value = Number(amount);
-
-        if (!Number.isFinite(value)) return null;
-
-        const fromRate = state.ratesPLN[from];
-        const toRate = state.ratesPLN[to];
-
-        if (!fromRate || !toRate) return null;
-
-        const valueInPLN = value * fromRate;
-
-        return valueInPLN / toRate;
-    }
-
-    function toDisplayCurrency(amountPLN, currency) {
-        return convert(amountPLN, "PLN", currency);
-    }
-
-    function getCurrencyRows() {
-        return state.currencies.map(item => ({
-            ...item,
-            selectedRate: convert(1, item.code, window.ArchiveData.displayCurrency || "USD")
-        }));
-    }
-
-    async function loadGold(force = false) {
-        if (force) cache.delete("nbp-gold");
-
-        const data = await request(
-            "https://api.nbp.pl/api/cenyzlota/?format=json",
-            "nbp-gold"
+    async function loadFallbackRates() {
+        const result = await safeRequest(
+            "Frankfurter",
+            "https://api.frankfurter.dev/v1/latest?base=PLN"
         );
 
-        if (!Array.isArray(data) || !data[0]) {
-            throw new Error("Unexpected NBP gold response.");
+        if (!result.success || !result.data?.rates) {
+            return false;
         }
 
-        const item = data[0];
+        const rates = {
+            PLN: 1,
+            ...result.data.rates
+        };
+
+        for (const [code, value] of Object.entries(rates)) {
+            if (!state.rates[code]) {
+                state.rates[code] = Number(value);
+            }
+        }
+
+        return true;
+    }
+
+    function convertFromPLN(value, currency = state.currency) {
+        const rate = state.rates[currency];
+
+        if (!Number.isFinite(Number(value)) || !rate) {
+            return null;
+        }
+
+        return Number(value) * rate;
+    }
+
+    function convertBetweenCurrencies(value, from, to) {
+        const fromRate = state.rates[from];
+        const toRate = state.rates[to];
+
+        if (
+            !Number.isFinite(Number(value)) ||
+            !fromRate ||
+            !toRate
+        ) {
+            return null;
+        }
+
+        return Number(value) / fromRate * toRate;
+    }
+
+    function getCurrencyRate(code) {
+        const plnPerUnit = state.rates[code];
+        const displayRate = state.rates[state.currency];
+
+        if (!plnPerUnit || !displayRate) {
+            return null;
+        }
+
+        return plnPerUnit / displayRate;
+    }
+
+    async function loadBitcoin() {
+        const result = await safeRequest(
+            "CoinGecko",
+            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=pln&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true"
+        );
+
+        if (!result.success || !result.data?.bitcoin) {
+            return false;
+        }
+
+        const btc = result.data.bitcoin;
+
+        const price = convertFromPLN(btc.pln);
+
+        const marketCap = convertFromPLN(btc.pln_market_cap);
+        const volume = convertFromPLN(btc.pln_24h_vol);
+
+        state.bitcoin = {
+            price,
+            pricePLN: btc.pln,
+            marketCap,
+            volume,
+            change24h: btc.pln_24h_change,
+            source: "CoinGecko",
+            updatedAt: new Date().toISOString()
+        };
+
+        return true;
+    }
+
+    async function loadBitcoinHistory(days = 30) {
+        const validDays = [1, 7, 30, 90, 365];
+
+        if (!validDays.includes(Number(days))) {
+            throw new Error("Invalid history period");
+        }
+
+        const result = await safeRequest(
+            "CoinGecko",
+            `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=pln&days=${days}`
+        );
+
+        if (!result.success || !result.data?.prices) {
+            return [];
+        }
+
+        return result.data.prices.map(point => ({
+            timestamp: point[0],
+            date: new Date(point[0]),
+            value: convertFromPLN(point[1])
+        }));
+    }
+
+    async function loadGold() {
+        const result = await safeRequest(
+            "NBP Gold",
+            "https://api.nbp.pl/api/cenyzlota/last/30/?format=json"
+        );
+
+        if (!result.success || !Array.isArray(result.data) || !result.data.length) {
+            return false;
+        }
+
+        const latest = result.data[result.data.length - 1];
 
         state.gold = {
-            date: item.data,
-            pricePLNPerGram: Number(item.cena),
+            pricePerGram: convertFromPLN(latest.cena),
+            pricePerGramPLN: latest.cena,
+            pricePerOunce: convertFromPLN(latest.cena * 31.1034768),
+            date: latest.data,
             source: "National Bank of Poland"
         };
 
-        return state.gold;
+        return true;
     }
 
-    async function loadBitcoin(force = false) {
-        if (force) cache.delete("bitcoin-current");
-
-        const data = await request(
-            "https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false",
-            "bitcoin-current"
+    async function loadGoldHistory() {
+        const result = await safeRequest(
+            "NBP Gold",
+            "https://api.nbp.pl/api/cenyzlota/last/30/?format=json"
         );
 
-        const market = data.market_data;
-
-        if (!market) throw new Error("Bitcoin market data is unavailable.");
-
-        state.bitcoin = {
-            name: data.name,
-            symbol: data.symbol,
-            usd: market.current_price.usd,
-            change24h: market.price_change_percentage_24h,
-            marketCapUSD: market.market_cap.usd,
-            volumeUSD: market.total_volume.usd,
-            highUSD: market.high_24h.usd,
-            lowUSD: market.low_24h.usd,
-            circulatingSupply: market.circulating_supply,
-            updatedAt: data.last_updated
-        };
-
-        return state.bitcoin;
-    }
-
-    async function loadBitcoinHistory(days = 7, currency = "usd", force = false) {
-        const key = "bitcoin-history-" + days + "-" + currency;
-
-        if (force) cache.delete(key);
-
-        const data = await request(
-            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=" +
-            encodeURIComponent(currency.toLowerCase()) +
-            "&days=" + encodeURIComponent(days),
-            key
-        );
-
-        if (!Array.isArray(data.prices)) {
-            throw new Error("Bitcoin historical prices are unavailable.");
+        if (!result.success || !Array.isArray(result.data)) {
+            return [];
         }
 
-        return data.prices.map(point => ({
-            date: new Date(point[0]),
-            value: Number(point[1])
+        return result.data.map(item => ({
+            date: item.data,
+            value: convertFromPLN(item.cena),
+            valuePLN: item.cena
         }));
     }
 
-    async function loadEconomy(iso3) {
+    async function loadEconomy(countryCode, indicator) {
+        const country = String(countryCode).toUpperCase();
+
+        const allowedIndicators = [
+            "NY.GDP.MKTP.KD.ZG",
+            "FP.CPI.TOTL.ZG",
+            "SL.UEM.TOTL.ZS",
+            "NY.GDP.PCAP.CD",
+            "SP.POP.TOTL"
+        ];
+
+        if (!/^[A-Z]{3}$/.test(country)) {
+            throw new Error("Invalid country code");
+        }
+
+        if (!allowedIndicators.includes(indicator)) {
+            throw new Error("Unsupported economic indicator");
+        }
+
+        const result = await safeRequest(
+            "World Bank",
+            `https://api.worldbank.org/v2/country/${country}/indicator/${indicator}?format=json&per_page=20`
+        );
+
+        if (!result.success || !Array.isArray(result.data?.[1])) {
+            return [];
+        }
+
+        return result.data[1]
+            .filter(item => item.value !== null)
+            .map(item => ({
+                year: item.date,
+                value: Number(item.value),
+                country: item.country?.value || country,
+                indicator: item.indicator?.value || indicator,
+                source: "World Bank"
+            }));
+    }
+
+    async function loadCountryOverview(countryCode) {
+        const country = String(countryCode).toUpperCase();
+
         const indicators = {
-            GDP: "NY.GDP.MKTP.KD.ZG",
+            gdp: "NY.GDP.MKTP.KD.ZG",
             inflation: "FP.CPI.TOTL.ZG",
             unemployment: "SL.UEM.TOTL.ZS",
             population: "SP.POP.TOTL"
         };
 
-        const result = {};
+        const entries = Object.entries(indicators);
 
-        await Promise.all(Object.entries(indicators).map(async ([key, indicator]) => {
-            const url =
-                "https://api.worldbank.org/v2/country/" +
-                encodeURIComponent(iso3) +
-                "/indicator/" +
-                indicator +
-                "?format=json&per_page=1&mrv=1";
+        const results = await Promise.all(
+            entries.map(async ([name, indicator]) => ({
+                name,
+                data: await loadEconomy(country, indicator)
+            }))
+        );
 
-            try {
-                const response = await request(url, null);
-                const row = Array.isArray(response) && response[1] && response[1][0]
-                    ? response[1][0]
-                    : null;
+        const output = {};
 
-                result[key] = row && row.value !== null
-                    ? {
-                        value: Number(row.value),
-                        year: row.date,
-                        source: "World Bank"
-                    }
-                    : null;
-            } catch {
-                result[key] = null;
-            }
-        }));
+        results.forEach(item => {
+            output[item.name] = item.data[0] || null;
+        });
 
-        return result;
+        return output;
     }
 
-    async function loadEconomyHistory(iso3, indicator) {
-        const url =
-            "https://api.worldbank.org/v2/country/" +
-            encodeURIComponent(iso3) +
-            "/indicator/" +
-            encodeURIComponent(indicator) +
-            "?format=json&per_page=30";
+    async function loadCountryList() {
+        const result = await safeRequest(
+            "World Bank",
+            "https://api.worldbank.org/v2/country?format=json&per_page=300"
+        );
 
-        const response = await request(url, null);
-
-        if (!Array.isArray(response) || !Array.isArray(response[1])) {
+        if (!result.success || !Array.isArray(result.data?.[1])) {
             return [];
         }
 
-        return response[1]
-            .filter(row => row.value !== null)
-            .map(row => ({
-                date: row.date,
-                value: Number(row.value)
-            }))
-            .reverse();
+        return result.data[1]
+            .filter(country => country.region?.id !== "NA")
+            .map(country => ({
+                id: country.id,
+                name: country.name,
+                capital: country.capitalCity,
+                region: country.region?.value,
+                incomeLevel: country.incomeLevel?.value
+            }));
     }
 
-    async function loadGoldHistory() {
-        const url = "https://api.nbp.pl/api/cenyzlota/last/30/?format=json";
-        const data = await request(url, null);
+    async function loadAll() {
+        state.errors = [];
 
-        if (!Array.isArray(data)) return [];
+        const results = await Promise.allSettled([
+            loadCurrencyRates(),
+            loadGold()
+        ]);
 
-        return data.map(item => ({
-            date: item.data,
-            value: Number(item.cena)
-        }));
+        await loadFallbackRates();
+
+        const bitcoinLoaded = await loadBitcoin();
+
+        state.lastUpdate = new Date();
+
+        return {
+            currencyRates: state.rates,
+            bitcoin: state.bitcoin,
+            gold: state.gold,
+            bitcoinLoaded,
+            results,
+            errors: [...state.errors],
+            updatedAt: state.lastUpdate
+        };
     }
 
-    async function loadCurrencyHistory(code, startDate, endDate) {
-        if (code === "PLN") return [];
-
-        const url =
-            "https://api.nbp.pl/api/exchangerates/rates/A/" +
-            encodeURIComponent(code.toLowerCase()) +
-            "/" + startDate + "/" + endDate +
-            "/?format=json";
-
-        const data = await request(url, null);
-
-        if (!data || !Array.isArray(data.rates)) return [];
-
-        return data.rates.map(item => ({
-            date: item.effectiveDate,
-            value: Number(item.mid)
-        }));
+    function getState() {
+        return {
+            currency: state.currency,
+            rates: { ...state.rates },
+            bitcoin: state.bitcoin ? { ...state.bitcoin } : null,
+            gold: state.gold ? { ...state.gold } : null,
+            lastUpdate: state.lastUpdate,
+            errors: [...state.errors]
+        };
     }
 
-    function clearCache() {
-        cache.clear();
+    function getCurrencies() {
+        return Object.keys(state.rates)
+            .sort()
+            .map(code => ({
+                code,
+                name: CURRENCY_NAMES[code] || code,
+                rate: getCurrencyRate(code)
+            }));
     }
 
-    window.ArchiveData = {
-        state,
-        currencyNames,
-        displayCurrency: "USD",
-        loadCurrencies,
-        loadGold,
+    function getCountryInfo(iso3) {
+        return COUNTRIES[String(iso3).toUpperCase()] || null;
+    }
+
+    return {
+        loadAll,
+        loadCurrencyRates,
+        loadFallbackRates,
         loadBitcoin,
         loadBitcoinHistory,
-        loadEconomy,
-        loadEconomyHistory,
+        loadGold,
         loadGoldHistory,
-        loadCurrencyHistory,
-        getCurrencyRows,
-        convert,
-        toDisplayCurrency,
-        formatNumber,
+        loadEconomy,
+        loadCountryOverview,
+        loadCountryList,
+
+        getState,
+        getCurrencies,
+        getCurrencyRate,
+        getCountryInfo,
+
+        getCurrency,
+        setCurrency,
+
+        convertFromPLN,
+        convertBetweenCurrencies,
+
         formatMoney,
-        formatDate,
-        clearCache,
-        round
+        formatNumber,
+        formatPercent,
+        getChangeClass
     };
+
 })();
